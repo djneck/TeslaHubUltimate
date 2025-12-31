@@ -1,19 +1,46 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-<meta charset="UTF-8" />
-<link rel="icon" type="image/svg+xml" href="/vite.svg" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Tesla Connected Hub</title>
-<script src="https://www.google.com/search?q=https://cdn.tailwindcss.com"></script>
-<style>
-body { background-color: black; margin: 0; padding: 0; overflow: hidden; }
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-</style>
-</head>
-<body>
-<div id="root"></div>
-<script type="module" src="/src/main.jsx"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <!-- Viewport optimisé pour l'écran tactile de la Tesla -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Tesla Connected Hub</title>
+    
+    <!-- Correction du lien Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+      /* Styles de base pour garantir l'immersion sombre */
+      body { 
+        background-color: black; 
+        margin: 0; 
+        padding: 0; 
+        overflow: hidden; 
+        height: 100vh;
+        width: 100vw;
+      }
+
+      /* Suppression des barres de défilement pour un look "App" */
+      .no-scrollbar::-webkit-scrollbar { 
+        display: none; 
+      }
+      .no-scrollbar { 
+        -ms-overflow-style: none; 
+        scrollbar-width: none; 
+      }
+
+      /* Animation de chargement si nécessaire */
+      #root {
+        height: 100%;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Point d'entrée de votre code React -->
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
+
