@@ -55,32 +55,31 @@ import {
   BrainCircuit,
   Command
 } from 'lucide-react';
-import { SpeedInsights } from "@vercel/speed-insights/react";
 
-// --- CONFIGURATION FIREBASE ---
-const safeEnv = (key, fallback = "") => {
-  try {
-    return (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) || fallback;
-  } catch (e) {
-    return fallback;
-  }
+// --- CONFIGURATION FIREBASE RESTAURÉE ---
+// Utilisation des clés en dur pour éviter l'écran noir si les variables d'environnement échouent
+const firebaseConfig = {
+  apiKey: "AIzaSyAEzWBBxCofSH0eVkxuO9EYkTjsBYGqRc0",
+  authDomain: "media-hub-tesla.firebaseapp.com",
+  projectId: "media-hub-tesla",
+  storageBucket: "media-hub-tesla.firebasestorage.app",
+  messagingSenderId: "1008267221004",
+  appId: "1:1008267221004:web:4c66a3a2c1bb0a20f1f629",
+  measurementId: "G-HEPLJ3YM71",
+  databaseURL: "https://media-hub-tesla.firebaseio.com"
 };
 
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-  ? JSON.parse(__firebase_config) 
-  : {
-      apiKey: "",
-      authDomain: "media-hub-tesla.firebaseapp.com",
-      projectId: "media-hub-tesla",
-      storageBucket: "media-hub-tesla.firebasestorage.app",
-      messagingSenderId: "1008267221004",
-      appId: "1:1008267221004:web:4c66a3a2c1bb0a20f1f629"
-    };
+const appId = "tesla-ultimate-v18-5";
 
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'tesla-ultimate-v18-5';
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Initialisation sécurisée
+let app, auth, db;
+try {
+  app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (e) {
+  console.error("Erreur critique d'initialisation Firebase:", e);
+}
 
 const THEME_COLORS = [
   { name: 'Tesla Red', hex: '#E82127' },
@@ -115,6 +114,7 @@ const App = () => {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [error, setError] = useState(null);
   
   const [profile, setProfile] = useState({ name: 'Pilote', color: '#E82127', openMode: 'tab' });
   const [homeSearch, setHomeSearch] = useState('');
@@ -133,35 +133,52 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    // Fail-safe: si auth n'est pas initialisé, on arrête le chargement pour afficher l'erreur
+    if (!auth) {
+      setError("Service Auth non initialisé. Vérifiez la configuration.");
+      setLoading(false);
+      return;
+    }
+
     const initAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (e) { console.error(e); }
+        await signInAnonymously(auth);
+      } catch (e) { 
+        console.error("Auth Fail:", e);
+        setError(`Erreur de connexion: ${e.message}`);
+        // On force la fin du chargement même en cas d'erreur pour ne pas avoir un écran noir
+        setLoading(false);
+      }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
     });
-    return () => unsubscribe();
+    
+    // Timeout de sécurité : force l'affichage après 5 secondes si Firebase traîne
+    const timeout = setTimeout(() => setLoading(false), 5000);
+    
+    return () => {
+      unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   useEffect(() => {
-    if (!user) return;
-    const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), (d) => {
-      if (d.exists()) setProfile(prev => ({ ...prev, ...d.data() }));
-    });
-    const unsubLinks = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'links'), (s) => {
-      setLinks(s.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    const unsubNotes = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'notes'), (s) => {
-      setNotes(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
-    });
-    return () => { unsubProfile(); unsubLinks(); unsubNotes(); };
+    if (!user || !db) return;
+    try {
+      const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), (d) => {
+        if (d.exists()) setProfile(prev => ({ ...prev, ...d.data() }));
+      });
+      const unsubLinks = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'links'), (s) => {
+        setLinks(s.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+      const unsubNotes = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'notes'), (s) => {
+        setNotes(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+      });
+      return () => { unsubProfile(); unsubLinks(); unsubNotes(); };
+    } catch (e) { console.error("Firestore Error", e); }
   }, [user]);
 
   const handleLaunch = (url) => {
@@ -327,10 +344,11 @@ const App = () => {
   );
 
   if (loading) return (
-    <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+    <div className="min-h-screen bg-black flex items-center justify-center">
       <div className="flex flex-col items-center gap-8">
          <Loader2 className="w-20 h-20 text-red-600 animate-spin" />
          <p className="text-[12px] font-black uppercase tracking-[0.8em] text-white/20 italic animate-pulse">Ultimate Dash v18.5</p>
+         {error && <p className="text-red-500 font-bold bg-red-900/20 px-4 py-2 rounded">{error}</p>}
       </div>
     </div>
   );
