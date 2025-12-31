@@ -53,11 +53,12 @@ import {
   Cpu,
   ShieldCheck,
   BrainCircuit,
-  Command
+  Command,
+  AlertCircle
 } from 'lucide-react';
 
-// --- CONFIGURATION FIREBASE RESTAURÉE ---
-// Utilisation des clés en dur pour éviter l'écran noir si les variables d'environnement échouent
+// --- CONFIGURATION FIREBASE GARANTIE ---
+// Clés en dur pour éviter tout problème de variables d'environnement
 const firebaseConfig = {
   apiKey: "AIzaSyAEzWBBxCofSH0eVkxuO9EYkTjsBYGqRc0",
   authDomain: "media-hub-tesla.firebaseapp.com",
@@ -69,16 +70,16 @@ const firebaseConfig = {
   databaseURL: "https://media-hub-tesla.firebaseio.com"
 };
 
-const appId = "tesla-ultimate-v18-5";
+const appId = "tesla-ultimate-v19";
 
-// Initialisation sécurisée
+// Initialisation sécurisée avec logs
 let app, auth, db;
 try {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
 } catch (e) {
-  console.error("Erreur critique d'initialisation Firebase:", e);
+  console.error("Erreur critique Firebase:", e);
 }
 
 const THEME_COLORS = [
@@ -133,9 +134,8 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    // Fail-safe: si auth n'est pas initialisé, on arrête le chargement pour afficher l'erreur
     if (!auth) {
-      setError("Service Auth non initialisé. Vérifiez la configuration.");
+      setError("Firebase Auth non disponible");
       setLoading(false);
       return;
     }
@@ -145,24 +145,21 @@ const App = () => {
         await signInAnonymously(auth);
       } catch (e) { 
         console.error("Auth Fail:", e);
-        setError(`Erreur de connexion: ${e.message}`);
-        // On force la fin du chargement même en cas d'erreur pour ne pas avoir un écran noir
-        setLoading(false);
+        setError("Mode hors ligne (Auth échoué)");
+        setLoading(false); // Force le chargement même si erreur
       }
     };
     initAuth();
+    
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
     });
+
+    // Sécurité : Force l'affichage après 4 secondes si ça bloque
+    const safetyTimer = setTimeout(() => setLoading(false), 4000);
     
-    // Timeout de sécurité : force l'affichage après 5 secondes si Firebase traîne
-    const timeout = setTimeout(() => setLoading(false), 5000);
-    
-    return () => {
-      unsubscribe();
-      clearTimeout(timeout);
-    };
+    return () => { unsubscribe(); clearTimeout(safetyTimer); };
   }, []);
 
   useEffect(() => {
@@ -347,8 +344,7 @@ const App = () => {
     <div className="min-h-screen bg-black flex items-center justify-center">
       <div className="flex flex-col items-center gap-8">
          <Loader2 className="w-20 h-20 text-red-600 animate-spin" />
-         <p className="text-[12px] font-black uppercase tracking-[0.8em] text-white/20 italic animate-pulse">Ultimate Dash v18.5</p>
-         {error && <p className="text-red-500 font-bold bg-red-900/20 px-4 py-2 rounded">{error}</p>}
+         <p className="text-[12px] font-black uppercase tracking-[0.8em] text-white/20 italic animate-pulse">Chargement...</p>
       </div>
     </div>
   );
@@ -411,7 +407,7 @@ const App = () => {
         </div>
       </header>
 
-      {/* NAVIGATION ICONIQUE PERSISTANTE - STYLE BOUTON ET NEON */}
+      {/* NAVIGATION ICONIQUE PERSISTANTE */}
       <nav className="flex justify-center gap-6 py-6 bg-black/40 backdrop-blur-xl border-b border-white/5 z-40 px-4 overflow-x-auto no-scrollbar">
         <button 
           onClick={() => setView('home')} 
@@ -443,6 +439,13 @@ const App = () => {
 
       <main className="flex-1 overflow-y-auto no-scrollbar p-10 lg:p-14 pb-48">
         
+        {/* ALERTE ERREUR SI AUTH ECHOUE */}
+        {error && (
+          <div className="mb-8 p-6 bg-red-600/10 border border-red-600/20 rounded-3xl flex items-center gap-4 text-red-500 font-bold animate-pulse">
+            <AlertCircle className="w-6 h-6" /> {error}
+          </div>
+        )}
+
         {/* VUE : ACCUEIL */}
         {view === 'home' && (
           <div className="max-w-7xl mx-auto space-y-24 animate-in fade-in slide-in-from-bottom-10 duration-700">
@@ -471,7 +474,7 @@ const App = () => {
               </div>
             </div>
 
-            {/* DASHBOARD GRID TILES - RECENTRÉES ET STYLISÉES */}
+            {/* DASHBOARD GRID TILES */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12">
               {categories.map(cat => (
                 <button
@@ -527,7 +530,7 @@ const App = () => {
           </div>
         )}
 
-        {/* VUE : CATEGORIE (NOM SOUS ICONE + EDIT DÉPORTÉ) */}
+        {/* VUE : CATEGORIE */}
         {view === 'category' && (
           <div className="max-w-7xl mx-auto space-y-24 animate-in fade-in duration-500">
             <div className="flex items-center justify-between border-b border-white/10 pb-20">
@@ -599,7 +602,7 @@ const App = () => {
               </div>
             )}
 
-            {/* APP GRID - NOM EN DESSOUS + BOUTON MOLETTE À DROITE DU NOM */}
+            {/* APP GRID */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-20 gap-y-28">
               {allLinks.filter(l => l.category === activeTab).map((link) => (
                 <div key={link.id} className="flex flex-col items-center group relative">
@@ -611,7 +614,6 @@ const App = () => {
                     <img src={link.icon} alt={link.name} onError={(e) => e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(link.name)}&background=111&color=fff&bold=true`} className="w-32 h-32 object-contain filter drop-shadow-[0_0_20px_rgba(0,0,0,0.6)] group-hover:scale-115 transition-transform duration-500 relative z-10" />
                   </button>
                   
-                  {/* LABEL SOUS ICONE AVEC EDIT À CÔTÉ - TEXTE AJUSTÉ */}
                   <div className="mt-4 flex items-center justify-center gap-2 w-full">
                     <span className="font-black text-xl tracking-tight text-white/40 uppercase italic group-hover:text-white transition-all truncate max-w-[150px]">{link.name}</span>
                     <button 
@@ -738,7 +740,7 @@ const App = () => {
       )}
 
       <footer className="py-16 text-center opacity-5 mt-auto pointer-events-none z-50">
-        <p className="text-[28px] font-black uppercase tracking-[3.8em] italic">Tesla OS Unified • v18.5</p>
+        <p className="text-[28px] font-black uppercase tracking-[3.8em] italic">Tesla OS Unified • v19.0</p>
       </footer>
     </div>
   );
