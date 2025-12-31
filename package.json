@@ -1,6 +1,6 @@
 {
 "name": "media-hub-tesla",
-"private": false,
+"private": true,
 "version": "1.0.0",
 "type": "module",
 "scripts": {
@@ -12,7 +12,8 @@
 "firebase": "^10.7.1",
 "lucide-react": "^0.303.0",
 "react": "^18.2.0",
-"react-dom": "^18.2.0"
+"react-dom": "^18.2.0",
+"@vercel/speed-insights": "^1.0.10"
 },
 "devDependencies": {
 "@vitejs/plugin-react": "^4.2.1",
