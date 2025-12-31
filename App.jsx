@@ -1,3 +1,17 @@
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+};
+
+### Rappels importants :
+1.  **Fichier `.gitignore`** : Assurez-vous que votre fichier `.env` est listé dans votre `.gitignore` pour ne jamais envoyer vos clés sur GitHub.
+2.  **Sur Vercel** : Vous devrez copier ces mêmes noms et valeurs dans l'onglet **Settings > Environment Variables** de votre projet Vercel pour que l'application fonctionne une fois en ligne.
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
