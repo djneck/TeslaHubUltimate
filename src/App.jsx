@@ -3,17 +3,16 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getAuth, 
   signInAnonymously, 
-  onAuthStateChanged,
-  signInWithCustomToken 
+  onAuthStateChanged 
 } from 'firebase/auth';
 import { 
   getFirestore, 
   collection, 
   doc, 
-  setDoc,
-  addDoc, 
   onSnapshot, 
-  deleteDoc, 
+  setDoc,
+  addDoc,
+  deleteDoc,
   serverTimestamp 
 } from 'firebase/firestore';
 import { 
@@ -55,13 +54,13 @@ import {
   BrainCircuit,
   Command
 } from 'lucide-react';
-import { SpeedInsights } from "@vercel/speed-insights/react";
+
+// NOTE: Pour activer SpeedInsights, décommentez la ligne ci-dessous après avoir installé le package
+// import { SpeedInsights } from "@vercel/speed-insights/react";
 
 // --- CONFIGURATION FIREBASE SECURISEE ---
-// Cette fonction tente de lire les variables Vercel, sinon utilise vos clés en dur
 const getEnv = (key, fallback) => {
   try {
-    // Vérification de sécurité pour l'environnement de build
     if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
       return import.meta.env[key];
     }
@@ -71,7 +70,6 @@ const getEnv = (key, fallback) => {
   return fallback;
 };
 
-// VOS CLES SONT ICI EN "FALLBACK" POUR GARANTIR LE FONCTIONNEMENT
 const firebaseConfig = {
   apiKey: getEnv("VITE_FIREBASE_API_KEY", "AIzaSyAEzWBBxCofSH0eVkxuO9EYkTjsBYGqRc0"),
   authDomain: getEnv("VITE_FIREBASE_AUTH_DOMAIN", "media-hub-tesla.firebaseapp.com"),
@@ -85,7 +83,6 @@ const firebaseConfig = {
 
 const appId = getEnv("VITE_APP_ID", "tesla-ultimate-v18-5");
 
-// Initialisation Firebase robuste
 let app, auth, db;
 try {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -741,7 +738,7 @@ const App = () => {
       )}
 
       <footer className="py-16 text-center opacity-5 mt-auto pointer-events-none z-50">
-        <p className="text-[28px] font-black uppercase tracking-[3.8em] italic">Tesla OS Unified • v18.5</p>
+        <p className="text-[28px] font-black uppercase tracking-[3.8em] italic">Tesla OS Unified • v19.0</p>
       </footer>
     </div>
   );
