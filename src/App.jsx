@@ -3,16 +3,17 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getAuth, 
   signInAnonymously, 
-  onAuthStateChanged 
+  onAuthStateChanged,
+  signInWithCustomToken 
 } from 'firebase/auth';
 import { 
   getFirestore, 
   collection, 
   doc, 
-  onSnapshot, 
   setDoc,
-  addDoc,
-  deleteDoc,
+  addDoc, 
+  onSnapshot, 
+  deleteDoc, 
   serverTimestamp 
 } from 'firebase/firestore';
 import { 
@@ -54,43 +55,32 @@ import {
   BrainCircuit,
   Command
 } from 'lucide-react';
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
-// NOTE: Pour activer SpeedInsights, décommentez la ligne ci-dessous après avoir installé le package
-// import { SpeedInsights } from "@vercel/speed-insights/react";
-
-// --- CONFIGURATION FIREBASE SECURISEE ---
-const getEnv = (key, fallback) => {
+// --- CONFIGURATION FIREBASE ---
+const safeEnv = (key, fallback = "") => {
   try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-      return import.meta.env[key];
-    }
+    return (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) || fallback;
   } catch (e) {
-    // Ignorer l'erreur en cas de build strict
+    return fallback;
   }
-  return fallback;
 };
 
-const firebaseConfig = {
-  apiKey: getEnv("VITE_FIREBASE_API_KEY", "AIzaSyAEzWBBxCofSH0eVkxuO9EYkTjsBYGqRc0"),
-  authDomain: getEnv("VITE_FIREBASE_AUTH_DOMAIN", "media-hub-tesla.firebaseapp.com"),
-  projectId: getEnv("VITE_FIREBASE_PROJECT_ID", "media-hub-tesla"),
-  storageBucket: getEnv("VITE_FIREBASE_STORAGE_BUCKET", "media-hub-tesla.firebasestorage.app"),
-  messagingSenderId: getEnv("VITE_FIREBASE_MESSAGING_SENDER_ID", "1008267221004"),
-  appId: getEnv("VITE_FIREBASE_APP_ID", "1:1008267221004:web:4c66a3a2c1bb0a20f1f629"),
-  measurementId: getEnv("VITE_FIREBASE_MEASUREMENT_ID", "G-HEPLJ3YM71"),
-  databaseURL: getEnv("VITE_FIREBASE_DATABASE_URL", "https://media-hub-tesla.firebaseio.com")
-};
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+      apiKey: "",
+      authDomain: "media-hub-tesla.firebaseapp.com",
+      projectId: "media-hub-tesla",
+      storageBucket: "media-hub-tesla.firebasestorage.app",
+      messagingSenderId: "1008267221004",
+      appId: "1:1008267221004:web:4c66a3a2c1bb0a20f1f629"
+    };
 
-const appId = getEnv("VITE_APP_ID", "tesla-ultimate-v18-5");
-
-let app, auth, db;
-try {
-  app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-} catch (e) {
-  console.error("Erreur critique Firebase:", e);
-}
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'tesla-ultimate-v18-5';
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 const THEME_COLORS = [
   { name: 'Tesla Red', hex: '#E82127' },
@@ -125,7 +115,6 @@ const App = () => {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [error, setError] = useState(null);
   
   const [profile, setProfile] = useState({ name: 'Pilote', color: '#E82127', openMode: 'tab' });
   const [homeSearch, setHomeSearch] = useState('');
@@ -144,18 +133,14 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (!auth) {
-      setError("Service Auth indisponible");
-      setLoading(false);
-      return;
-    }
     const initAuth = async () => {
       try {
-        await signInAnonymously(auth);
-      } catch (e) { 
-        console.error("Auth Fail:", e);
-        setError(`Erreur de connexion: ${e.message}`);
-      }
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (e) { console.error(e); }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -166,19 +151,17 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (!user || !db) return;
-    try {
-      const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), (d) => {
-        if (d.exists()) setProfile(prev => ({ ...prev, ...d.data() }));
-      });
-      const unsubLinks = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'links'), (s) => {
-        setLinks(s.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
-      const unsubNotes = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'notes'), (s) => {
-        setNotes(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
-      });
-      return () => { unsubProfile(); unsubLinks(); unsubNotes(); };
-    } catch (e) { console.error("Firestore Error", e); }
+    if (!user) return;
+    const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), (d) => {
+      if (d.exists()) setProfile(prev => ({ ...prev, ...d.data() }));
+    });
+    const unsubLinks = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'links'), (s) => {
+      setLinks(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const unsubNotes = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'notes'), (s) => {
+      setNotes(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+    });
+    return () => { unsubProfile(); unsubLinks(); unsubNotes(); };
   }, [user]);
 
   const handleLaunch = (url) => {
@@ -344,11 +327,10 @@ const App = () => {
   );
 
   if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center">
       <div className="flex flex-col items-center gap-8">
          <Loader2 className="w-20 h-20 text-red-600 animate-spin" />
          <p className="text-[12px] font-black uppercase tracking-[0.8em] text-white/20 italic animate-pulse">Ultimate Dash v18.5</p>
-         {error && <p className="text-red-500 font-bold bg-red-900/20 px-4 py-2 rounded">{error}</p>}
       </div>
     </div>
   );
@@ -738,7 +720,7 @@ const App = () => {
       )}
 
       <footer className="py-16 text-center opacity-5 mt-auto pointer-events-none z-50">
-        <p className="text-[28px] font-black uppercase tracking-[3.8em] italic">Tesla OS Unified • v19.0</p>
+        <p className="text-[28px] font-black uppercase tracking-[3.8em] italic">Tesla OS Unified • v18.5</p>
       </footer>
     </div>
   );
