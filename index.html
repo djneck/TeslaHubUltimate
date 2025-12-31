@@ -3,43 +3,55 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <!-- Viewport optimisé pour l'écran tactile de la Tesla -->
+    <!-- Optimisation du viewport pour éviter les zooms intempestifs sur l'écran Tesla -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Tesla Connected Hub</title>
     
-    <!-- Correction du lien Tailwind CSS -->
+    <!-- Importation de Tailwind CSS pour le design -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-      /* Styles de base pour garantir l'immersion sombre */
-      body { 
-        background-color: black; 
-        margin: 0; 
-        padding: 0; 
-        overflow: hidden; 
+      /* Styles globaux pour une interface immersive et fluide */
+      body {
+        background-color: #050505; /* Noir profond Tesla */
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* Empêche le défilement parasite du navigateur */
         height: 100vh;
         width: 100vw;
+        color: white;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       }
 
-      /* Suppression des barres de défilement pour un look "App" */
-      .no-scrollbar::-webkit-scrollbar { 
-        display: none; 
+      /* Suppression visuelle des barres de défilement (WebKit/Tesla) */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
       }
-      .no-scrollbar { 
-        -ms-overflow-style: none; 
-        scrollbar-width: none; 
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
       }
 
-      /* Animation de chargement si nécessaire */
       #root {
         height: 100%;
         width: 100%;
       }
+      
+      /* Empêcher la sélection de texte pour un aspect plus "application native" */
+      * {
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
     </style>
   </head>
   <body>
+    <!-- Point de montage pour l'application React -->
     <div id="root"></div>
-    <!-- Point d'entrée de votre code React -->
+
+    /**
+     * ATTENTION : Le chemin ci-dessous pointe vers le point d'entrée JS.
+     * Assurez-vous que votre fichier main.jsx se trouve bien dans le dossier /src.
+     */
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
