@@ -42,11 +42,11 @@ import {
   Monitor,
   CheckCircle2,
   Car,
-  AlertCircle
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react';
 
 // --- GESTION SÉCURISÉE DES VARIABLES D'ENVIRONNEMENT ---
-// Correction pour éviter l'erreur "import.meta" dans certains environnements de compilation
 const safeEnv = (key, fallback = "") => {
   try {
     return import.meta.env[key] || fallback;
@@ -104,6 +104,7 @@ const App = () => {
   const [showBookmarkInfo, setShowBookmarkInfo] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   const [aiPrompt, setAiPrompt] = useState('');
   const [selectedAI, setSelectedAI] = useState(AI_PROVIDERS[0]);
@@ -126,7 +127,10 @@ const App = () => {
     const login = async () => {
       try {
         await signInAnonymously(auth);
-      } catch (e) { console.error(e); }
+      } catch (e) { 
+        console.error(e); 
+        setError("Accès Cloud restreint. Vérifiez l'auth anonyme.");
+      }
     };
     login();
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -204,14 +208,46 @@ const App = () => {
       { name: 'YouTube', url: 'https://www.youtube.com', icon: getIcon('youtube.com') },
       { name: 'Disney+', url: 'https://www.disneyplus.com', icon: getIcon('disneyplus.com') },
       { name: 'Prime Video', url: 'https://www.primevideo.com', icon: getIcon('primevideo.com') },
+      { name: 'Crunchyroll', url: 'https://www.crunchyroll.com', icon: getIcon('crunchyroll.com') },
+      { name: 'OQEE by Free', url: 'https://oqee.tv', icon: getIcon('oqee.tv') },
+      { name: 'MyCanal', url: 'https://www.canalplus.com', icon: getIcon('canalplus.com') },
     ],
     music: [
       { name: 'Spotify', url: 'https://open.spotify.com', icon: getIcon('spotify.com') },
       { name: 'Deezer', url: 'https://www.deezer.com', icon: getIcon('deezer.com') },
+      { name: 'Apple Music', url: 'https://music.apple.com', icon: getIcon('apple.com') },
+      { name: 'SoundCloud', url: 'https://soundcloud.com', icon: getIcon('soundcloud.com') },
+    ],
+    games: [
+      { name: 'Xbox Cloud', url: 'https://www.xbox.com/play', icon: getIcon('xbox.com') },
+      { name: 'GeForce Now', url: 'https://play.geforcenow.com', icon: getIcon('nvidia.com') },
+      { name: 'Steam Web', url: 'https://store.steampowered.com', icon: getIcon('steampowered.com') },
+      { name: 'Chess.com', url: 'https://www.chess.com', icon: getIcon('chess.com') },
+      { name: 'Roblox', url: 'https://www.roblox.com', icon: getIcon('roblox.com') },
     ],
     travel: [
+      { name: 'Waze', url: 'https://www.waze.com/live-map', icon: getIcon('waze.com') },
       { name: 'ABRP', url: 'https://abetterrouteplanner.com', icon: getIcon('abetterrouteplanner.com') },
+      { name: 'Google Maps', url: 'https://www.google.com/maps', icon: getIcon('google.com') },
+      { name: 'TripAdvisor', url: 'https://www.tripadvisor.fr', icon: getIcon('tripadvisor.fr') },
       { name: 'PlugShare', url: 'https://www.plugshare.com', icon: getIcon('plugshare.com') },
+    ],
+    icloud: [
+      { name: 'iCloud Mail', url: 'https://www.icloud.com/mail', icon: getIcon('icloud.com') },
+      { name: 'Photos', url: 'https://www.icloud.com/photos', icon: getIcon('apple.com') },
+      { name: 'Drive', url: 'https://www.icloud.com/iclouddrive', icon: getIcon('icloud.com') },
+      { name: 'Notes', url: 'https://www.icloud.com/notes', icon: getIcon('apple.com') },
+    ],
+    personal: [
+      { name: 'Gmail', url: 'https://mail.google.com', icon: getIcon('gmail.com') },
+      { name: 'Notion', url: 'https://www.notion.so', icon: getIcon('notion.so') },
+      { name: 'WhatsApp', url: 'https://web.whatsapp.com', icon: getIcon('whatsapp.com') },
+      { name: 'Discord', url: 'https://discord.com/app', icon: getIcon('discord.com') },
+    ],
+    tesla: [
+      { name: 'TezLab', url: 'https://tezlabapp.com', icon: getIcon('tezlabapp.com') },
+      { name: 'Tessie', url: 'https://www.tessie.com', icon: getIcon('tessie.com') },
+      { name: 'Tesla Web', url: 'https://www.tesla.com', icon: getIcon('tesla.com') },
     ]
   };
 
@@ -266,17 +302,23 @@ const App = () => {
       </header>
 
       <nav className="px-8 py-4 flex gap-3 overflow-x-auto no-scrollbar relative z-50 bg-black/20">
-        <button onClick={() => setActiveCategory('home')} className={`flex items-center gap-2 px-6 py-4 rounded-2xl transition-all text-[10px] font-black uppercase tracking-widest ${activeCategory === 'home' ? 'bg-white text-black' : 'bg-white/5 text-white/40'}`}>
+        <button onClick={() => setActiveCategory('home')} className={`flex items-center gap-2 px-6 py-4 rounded-2xl transition-all text-[10px] font-black uppercase tracking-widest ${activeCategory === 'home' ? 'bg-white text-black' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>
           <Home className="w-4 h-4" /> Accueil
         </button>
         {categories.map(cat => (
-          <button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${activeCategory === cat.id ? 'bg-white text-black' : 'bg-white/5 text-white/40'}`}>
+          <button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${activeCategory === cat.id ? 'bg-white text-black' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>
             {React.cloneElement(cat.icon, { className: "w-4 h-4" })} {cat.label}
           </button>
         ))}
       </nav>
 
       <main className="flex-1 relative z-10 overflow-y-auto p-8 lg:p-12 no-scrollbar">
+        {error && (
+          <div className="mb-6 p-4 bg-red-600/10 border border-red-600/20 rounded-2xl flex items-center gap-3 text-red-500 text-xs font-bold animate-pulse">
+            <AlertCircle className="w-5 h-5" /> {error}
+          </div>
+        )}
+
         {/* VUE : ACCUEIL */}
         {activeCategory === 'home' && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
@@ -296,31 +338,36 @@ const App = () => {
         {activeCategory === 'ai' && (
           <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in">
             <div className="text-center">
-              <h2 className="text-4xl font-black italic uppercase">Assistant IA</h2>
-              <p className="text-white/40 text-sm mt-2 uppercase tracking-widest">Moteurs de recherche & LLM</p>
+              <h2 className="text-4xl font-black italic uppercase tracking-tighter">Assistant Intelligent</h2>
+              <p className="text-white/40 text-sm mt-2 uppercase tracking-[0.3em]">Cerveaux & Moteurs de recherche</p>
             </div>
-            <div className="bg-white/5 border border-white/10 p-10 rounded-[4rem] space-y-10">
+            <div className="bg-white/5 border border-white/10 p-10 rounded-[4rem] space-y-10 shadow-2xl backdrop-blur-xl">
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="relative w-full md:w-72">
-                  <select value={selectedAI.id} onChange={(e) => setSelectedAI(AI_PROVIDERS.find(p => p.id === e.target.value))} className="w-full bg-black/40 border border-white/10 rounded-3xl p-5 appearance-none font-bold text-lg outline-none">
+                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 mb-2 block">Source</label>
+                  <select value={selectedAI.id} onChange={(e) => setSelectedAI(AI_PROVIDERS.find(p => p.id === e.target.value))} className="w-full bg-black/40 border border-white/10 rounded-3xl p-5 appearance-none font-bold text-lg outline-none focus:border-white/20">
                     {AI_PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
+                  <ChevronDown className="absolute right-5 top-[3.2rem] w-5 h-5 text-white/20 pointer-events-none" />
                 </div>
                 <div className="flex-1 relative">
-                  <input type="text" value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && executeAiPrompt()} placeholder="Posez votre question..." className="w-full bg-black/40 border border-white/10 rounded-3xl p-5 pr-32 text-xl font-medium outline-none" />
-                  <div className="absolute right-2 top-2 flex gap-2">
-                    <button onClick={() => { if (isDictatingAI) recognitionRef.current?.stop(); else { setIsDictatingAI(true); recognitionRef.current?.start(); } }} className={`p-4 rounded-2xl ${isDictatingAI ? 'bg-red-600 animate-pulse' : 'bg-white/5'}`}>
-                      {isDictatingAI ? <MicOff /> : <Mic />}
+                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 mb-2 block">Prompt</label>
+                  <input type="text" value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && executeAiPrompt()} placeholder="Posez votre question..." className="w-full bg-black/40 border border-white/10 rounded-3xl p-5 pr-32 text-xl font-medium outline-none focus:border-white/20" />
+                  <div className="absolute right-2 top-[2.5rem] flex gap-2">
+                    <button onClick={() => { if (isDictatingAI) recognitionRef.current?.stop(); else { setIsDictatingAI(true); recognitionRef.current?.start(); } }} className={`p-3 rounded-2xl transition-all ${isDictatingAI ? 'bg-red-600 animate-pulse text-white shadow-lg shadow-red-600/30' : 'bg-white/5 text-white/40'}`}>
+                      {isDictatingAI ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                     </button>
-                    <button onClick={executeAiPrompt} className="p-4 bg-white text-black rounded-2xl"><Send /></button>
+                    <button onClick={executeAiPrompt} className="p-3 bg-white text-black rounded-2xl hover:scale-110 active:scale-95 transition-all shadow-xl">
+                      <Send className="w-6 h-6" />
+                    </button>
                   </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                 {AI_PROVIDERS.map(ai => (
-                  <button key={ai.id} onClick={() => setSelectedAI(ai)} className={`p-6 rounded-3xl border transition-all ${selectedAI.id === ai.id ? 'bg-white/10 border-white/30 scale-105' : 'bg-black/20 border-white/5 opacity-60'}`}>
-                    <img src={ai.icon} className="w-12 h-12 mx-auto rounded-2xl mb-4" alt="" />
-                    <span className="text-[10px] font-black uppercase text-center block">{ai.name}</span>
+                  <button key={ai.id} onClick={() => setSelectedAI(ai)} className={`p-6 rounded-[2rem] border transition-all ${selectedAI.id === ai.id ? 'bg-white/10 border-white/30 scale-105 shadow-xl' : 'bg-black/20 border-white/5 opacity-60 hover:opacity-100'}`}>
+                    <img src={ai.icon} className="w-12 h-12 mx-auto rounded-2xl mb-4 shadow-xl" alt="" />
+                    <span className="text-[10px] font-black uppercase text-center block tracking-tighter">{ai.name.split(' ')[1] || ai.name}</span>
                   </button>
                 ))}
               </div>
@@ -330,21 +377,22 @@ const App = () => {
 
         {/* VUE : NOTES */}
         {activeCategory === 'notes' && (
-          <div className="space-y-12 animate-in fade-in max-w-5xl mx-auto">
-            <div className="bg-white/5 border border-white/10 p-10 rounded-[3.5rem] space-y-6">
-              <textarea value={noteInput} onChange={(e) => setNoteInput(e.target.value)} placeholder="Nouvelle note..." className="w-full bg-black/40 border border-white/10 rounded-2xl p-6 min-h-[150px] outline-none text-xl font-medium" />
+          <div className="space-y-12 animate-in fade-in max-w-5xl mx-auto pb-20">
+            <div className="bg-white/5 border border-white/10 p-10 rounded-[3.5rem] space-y-6 shadow-2xl backdrop-blur-xl">
+              <h3 className="text-xl font-black italic uppercase flex items-center gap-3"><StickyNote style={{ color: profile.color }} /> Blocs-Notes Cloud</h3>
+              <textarea value={noteInput} onChange={(e) => setNoteInput(e.target.value)} placeholder="Écrivez ou dictez votre note ici..." className="w-full bg-black/40 border border-white/10 rounded-2xl p-6 min-h-[150px] outline-none text-xl font-medium focus:border-white/20 transition-all" />
               <div className="flex gap-4">
-                <button onClick={() => { if (isDictatingAI) recognitionRef.current?.stop(); else { setIsDictatingAI(true); recognitionRef.current?.start(); } }} className={`px-8 py-4 rounded-2xl font-black text-xs uppercase ${isDictatingAI ? 'bg-red-600 animate-pulse' : 'bg-white/5'}`}>Dictée</button>
-                <button onClick={async () => { if (!user || !noteInput.trim()) return; await addDoc(collection(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'notes'), { text: noteInput, date: new Date().toLocaleString(), createdAt: serverTimestamp() }); setNoteInput(''); }} className="flex-1 bg-white text-black py-4 rounded-2xl font-black text-xs uppercase">Enregistrer</button>
+                <button onClick={() => { if (isDictatingAI) recognitionRef.current?.stop(); else { setIsDictatingAI(true); recognitionRef.current?.start(); } }} className={`px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest ${isDictatingAI ? 'bg-red-600 animate-pulse text-white' : 'bg-white/5 hover:bg-white/10'}`}>DICTÉE</button>
+                <button onClick={async () => { if (!user || !noteInput.trim()) return; await addDoc(collection(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'notes'), { text: noteInput, date: new Date().toLocaleString('fr-FR'), createdAt: serverTimestamp() }); setNoteInput(''); }} className="flex-1 bg-white text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all shadow-xl">ENREGISTRER</button>
               </div>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {notes.map(note => (
-                <div key={note.id} className="bg-yellow-100 text-black p-8 rounded-[2.5rem] relative group shadow-2xl">
+                <div key={note.id} className="bg-yellow-100 text-black p-8 rounded-[2.5rem] relative group shadow-2xl transition-all hover:-rotate-1">
                   <p className="font-bold text-lg mb-6 leading-tight">{note.text}</p>
-                  <div className="flex justify-between items-center opacity-30 text-[9px] font-black uppercase">
+                  <div className="flex justify-between items-center opacity-30 text-[9px] font-black uppercase tracking-widest">
                     <span>{note.date}</span>
-                    <button onClick={() => deleteDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'notes', note.id))}><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => deleteDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'notes', note.id))} className="p-2 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
               ))}
@@ -354,25 +402,25 @@ const App = () => {
 
         {/* VUE : PARAMÈTRES */}
         {activeCategory === 'settings' && (
-          <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-right-8">
-            <section className="bg-white/5 border border-white/10 p-10 rounded-[3.5rem] space-y-10">
-              <h2 className="text-2xl font-black italic uppercase flex items-center gap-4"><Settings style={{ color: profile.color }} /> Configuration</h2>
-              <div className="space-y-8">
+          <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-right-8 pb-20">
+            <section className="bg-white/5 border border-white/10 p-10 rounded-[3.5rem] space-y-10 shadow-2xl backdrop-blur-xl">
+              <h2 className="text-2xl font-black italic uppercase flex items-center gap-4"><Settings style={{ color: profile.color }} /> Configuration Pilote</h2>
+              <div className="space-y-10">
                 <div>
-                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 mb-2 block">Nom du Pilote</label>
-                  <input type="text" value={profile.name} onChange={(e) => updateProfile({ name: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-2xl p-5 text-2xl font-black outline-none" />
+                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 mb-2 block">Identification</label>
+                  <input type="text" value={profile.name} onChange={(e) => updateProfile({ name: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-2xl p-5 text-2xl font-black outline-none focus:border-white/20" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 mb-2 block">Mode d'ouverture</label>
-                  <div className="grid grid-cols-2 gap-3 p-2 bg-black/40 rounded-3xl">
-                    <button onClick={() => updateProfile({ openMode: 'tab' })} className={`py-4 rounded-2xl font-black text-[10px] uppercase ${profile.openMode === 'tab' ? 'bg-white text-black' : 'text-white/40'}`}>Onglet</button>
-                    <button onClick={() => updateProfile({ openMode: 'fullscreen' })} className={`py-4 rounded-2xl font-black text-[10px] uppercase ${profile.openMode === 'fullscreen' ? 'bg-red-600' : 'text-white/40'}`}>Plein écran</button>
+                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 mb-2 block">Mode d'affichage</label>
+                  <div className="grid grid-cols-2 gap-3 p-2 bg-black/40 rounded-3xl border border-white/5">
+                    <button onClick={() => updateProfile({ openMode: 'tab' })} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${profile.openMode === 'tab' ? 'bg-white text-black shadow-xl' : 'text-white/40 hover:bg-white/5'}`}>Onglet</button>
+                    <button onClick={() => updateProfile({ openMode: 'fullscreen' })} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${profile.openMode === 'fullscreen' ? 'bg-red-600 text-white shadow-xl shadow-red-900/20' : 'text-white/40 hover:bg-white/5'}`}>Plein écran</button>
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 mb-2 block">Couleur du Thème</label>
-                  <div className="flex gap-4">
-                    {THEME_COLORS.map(c => <button key={c.hex} onClick={() => updateProfile({ color: c.hex })} className={`w-12 h-12 rounded-2xl transition-all ${profile.color === c.hex ? 'scale-110 ring-4 ring-white/20' : 'opacity-40'}`} style={{ backgroundColor: c.hex }} />)}
+                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 mb-2 block">Couleur Signature</label>
+                  <div className="flex gap-4 flex-wrap">
+                    {THEME_COLORS.map(c => <button key={c.hex} onClick={() => updateProfile({ color: c.hex })} className={`w-14 h-14 rounded-2xl transition-all ${profile.color === c.hex ? 'scale-110 ring-4 ring-white/20' : 'opacity-40 hover:opacity-80'}`} style={{ backgroundColor: c.hex }} />)}
                   </div>
                 </div>
               </div>
@@ -382,15 +430,20 @@ const App = () => {
 
         {/* VUE APPLICATIONS PAR CATÉGORIE */}
         {activeCategory !== 'home' && activeCategory !== 'settings' && activeCategory !== 'ai' && activeCategory !== 'notes' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 animate-in fade-in">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 animate-in fade-in pb-20">
             {filteredApps.map((app, idx) => (
-              <button key={idx} onClick={() => handleAppLaunch(app.url)} className="group flex flex-col items-center justify-center aspect-[4/3] rounded-[2.5rem] bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] transition-all relative">
-                <img src={app.icon} className="w-16 h-16 rounded-2xl mb-4 p-2 bg-black/40 border border-white/5 shadow-xl group-hover:scale-105 transition-transform" alt="" onError={(e) => e.target.src = getIcon(new URL(app.url).hostname)} />
-                <span className="font-black text-[10px] uppercase text-white/30 group-hover:text-white truncate px-4 w-full text-center">{app.name}</span>
-                {app.id && <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'apps', app.id)); }} className="absolute top-2 right-2 p-2 bg-red-600/0 hover:bg-red-600 rounded-xl transition-all opacity-0 group-hover:opacity-100"><Trash2 className="w-4 h-4" /></button>}
+              <button key={idx} onClick={() => handleAppLaunch(app.url)} className="group flex flex-col items-center justify-center aspect-[4/3] rounded-[2.5rem] bg-white/[0.03] border border-white/5 hover:border-white/20 hover:bg-white/[0.08] transition-all relative overflow-hidden shadow-xl active:scale-95">
+                <div className="w-16 h-16 bg-[#0a0a0a] rounded-2xl mb-4 flex items-center justify-center p-4 border border-white/5 group-hover:scale-105 transition-transform duration-300 shadow-2xl">
+                  <img src={app.icon} className="w-full h-full object-contain filter drop-shadow-lg" alt="" onError={(e) => e.target.src = getIcon(new URL(app.url).hostname)} />
+                </div>
+                <div className="flex items-center gap-1 overflow-hidden w-full px-4 justify-center">
+                  <span className="font-black text-[10px] uppercase text-white/30 group-hover:text-white truncate tracking-tighter">{app.name}</span>
+                  {profile.openMode === 'fullscreen' && <Maximize className="w-2.5 h-2.5 text-white/20" />}
+                </div>
+                {app.id && <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'apps', app.id)); }} className="absolute -top-1 -right-1 p-2.5 bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-10"><Trash2 className="w-4 h-4" /></button>}
               </button>
             ))}
-            <button onClick={() => setShowAddModal(true)} className="flex flex-col items-center justify-center aspect-[4/3] rounded-[2.5rem] border-2 border-dashed border-white/5 hover:border-white/20 text-white/20 hover:text-white transition-all">
+            <button onClick={() => setShowAddModal(true)} className="flex flex-col items-center justify-center aspect-[4/3] rounded-[2.5rem] border-2 border-dashed border-white/5 hover:border-white/20 text-white/10 hover:text-white transition-all active:scale-95">
               <Plus className="w-8 h-8 mb-2" />
               <span className="font-black text-[9px] uppercase tracking-widest">Ajouter</span>
             </button>
@@ -408,21 +461,21 @@ const App = () => {
       {showAddModal && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-3xl flex items-center justify-center z-[100] p-6 animate-in zoom-in duration-200">
           <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-lg rounded-[3.5rem] p-10 space-y-8 shadow-2xl">
-            <h2 className="text-2xl font-black italic uppercase tracking-tighter text-center">Nouveau Raccourci</h2>
+            <h2 className="text-2xl font-black italic uppercase tracking-widest text-center">Nouveau Raccourci</h2>
             <div className="space-y-4">
               <input type="text" value={newApp.name} onChange={(e) => setNewApp({...newApp, name: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-lg outline-none focus:border-red-500 font-bold" placeholder="Nom du service" />
               <input type="text" value={newApp.url} onChange={(e) => setNewApp({...newApp, url: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-lg outline-none focus:border-red-500 font-bold" placeholder="URL (ex: google.com)" />
             </div>
             <div className="flex gap-4">
-              <button onClick={() => setShowAddModal(false)} className="flex-1 py-5 rounded-3xl font-black text-xs bg-white/5 uppercase">Fermer</button>
-              <button onClick={async () => { if (!user || !newApp.name || !newApp.url) return; const icon = getIcon(newApp.url.includes('http') ? new URL(newApp.url).hostname : newApp.url); await addDoc(collection(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'apps'), { ...newApp, icon, createdAt: serverTimestamp() }); setShowAddModal(false); setNewApp({ name: '', url: '', category: 'streaming' }); }} className="flex-1 py-5 rounded-3xl font-black text-xs bg-red-600 uppercase shadow-lg shadow-red-900/20">Valider</button>
+              <button onClick={() => setShowAddModal(false)} className="flex-1 py-5 rounded-3xl font-black text-xs bg-white/5 uppercase tracking-widest">Annuler</button>
+              <button onClick={async () => { if (!user || !newApp.name || !newApp.url) return; const icon = getIcon(newApp.url.includes('http') ? new URL(newApp.url).hostname : newApp.url); await addDoc(collection(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'apps'), { ...newApp, icon, createdAt: serverTimestamp() }); setShowAddModal(false); setNewApp({ name: '', url: '', category: activeCategory !== 'home' ? activeCategory : 'streaming' }); }} className="flex-1 py-5 rounded-3xl font-black text-xs bg-red-600 uppercase shadow-xl shadow-red-900/30 tracking-widest">Valider</button>
             </div>
           </div>
         </div>
       )}
 
-      <footer className="py-6 text-center opacity-10 select-none pointer-events-none">
-        <p className="text-[8px] font-black uppercase tracking-[1.5em] italic">Tesla OS Immersive • v14.5</p>
+      <footer className="py-6 text-center opacity-5 select-none pointer-events-none">
+        <p className="text-[8px] font-black uppercase tracking-[1.5em] italic">Tesla OS Immersive • v14.5 • Cloud Secure</p>
       </footer>
     </div>
   );
