@@ -1,18 +1,21 @@
 <!DOCTYPE html>
+
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Tesla Connected Hub</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { background-color: black; margin: 0; padding: 0; overflow: hidden; height: 100vh; width: 100vw; }
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Tesla Connected Hub</title>
+<!-- Lien Tailwind corrigé -->
+<script src="https://www.google.com/search?q=https://www.google.com/url%3Fsa%3DE%26source%3Dgmail%26q%3Dhttps://cdn.tailwindcss.com"></script>
+<style>
+body { background-color: black; margin: 0; padding: 0; overflow: hidden; height: 100vh; width: 100vw; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
 </head>
 <body class="bg-black">
-  <div id="root"></div>
-  <script type="module" src="src/main.jsx"></script>
+<div id="root"></div>
+<!-- Chemin relatif corrigé pour Vercel (sans le / au début) -->
+<script type="module" src="src/main.jsx"></script>
 </body>
 </html>
