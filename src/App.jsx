@@ -1,86 +1,85 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { 
-  getAuth, 
-  signInAnonymously, 
-  onAuthStateChanged,
-  signInWithCustomToken 
+import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged
 } from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
+import {
+  getFirestore,
+  collection,
+  doc,
+  onSnapshot,
   setDoc,
-  addDoc, 
-  onSnapshot, 
-  deleteDoc, 
-  serverTimestamp 
+  addDoc,
+  deleteDoc,
+  serverTimestamp
 } from 'firebase/firestore';
-import { 
-  Play, 
-  Gamepad2, 
-  Music, 
-  Plus, 
-  Trash2, 
-  Settings, 
-  Globe, 
-  Save,
-  Loader2,
+import {
+  Play,
+  Gamepad2,
+  Music,
+  Plus,
+  Trash2,
   Maximize,
-  Search,
-  Zap,
-  MessageSquare,
-  Coffee,
-  Monitor,
-  Edit2,
   X,
-  Send,
-  ArrowRight,
-  CheckCircle2,
-  Car,
-  Sparkles,
+  Search,
+  Briefcase,
   Navigation,
   Cloud,
-  Briefcase,
+  Mic,
+  MicOff,
   StickyNote,
-  MapPin,
+  Loader2,
+  Settings,
+  Palette,
+  Home,
+  Sparkles,
+  Brain,
+  ChevronDown,
+  Send,
   Star,
-  ChevronLeft,
-  ChevronRight,
-  History,
+  Monitor,
+  CheckCircle2,
+  Folder,
+  Pin,
+  Download,
+  Bell,
+  Wifi,
+  WifiOff,
+  GripVertical,
+  MessageCircle,
+  MessageSquare,
+  Coffee,
+  Car,
   LayoutGrid,
+  ArrowRight,
   ExternalLink,
-  Cpu,
-  ShieldCheck,
-  BrainCircuit,
-  Command,
-  AlertCircle
+  Edit2
 } from 'lucide-react';
 
-// --- CONFIGURATION FIREBASE GARANTIE ---
-// Clés en dur pour éviter tout problème de variables d'environnement
+// --- CONFIGURATION FIREBASE ---
 const firebaseConfig = {
-  apiKey: "AIzaSyAEzWBBxCofSH0eVkxuO9EYkTjsBYGqRc0",
-  authDomain: "media-hub-tesla.firebaseapp.com",
-  projectId: "media-hub-tesla",
-  storageBucket: "media-hub-tesla.firebasestorage.app",
-  messagingSenderId: "1008267221004",
-  appId: "1:1008267221004:web:4c66a3a2c1bb0a20f1f629",
-  measurementId: "G-HEPLJ3YM71",
-  databaseURL: "https://media-hub-tesla.firebaseio.com"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-const appId = "tesla-ultimate-v19";
-
-// Initialisation sécurisée avec logs
+// Initialisation sécurisée
 let app, auth, db;
 try {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
 } catch (e) {
-  console.error("Erreur critique Firebase:", e);
+  console.error('Firebase Initialization Error:', e);
 }
+
+const APP_INTERNAL_ID = import.meta.env.VITE_APP_ID || 'media-hub-tesla-hub-v14-5';
 
 const THEME_COLORS = [
   { name: 'Tesla Red', hex: '#E82127' },
@@ -94,125 +93,526 @@ const THEME_COLORS = [
   { name: 'Deep Crimson', hex: '#8B0000' },
   { name: 'Mint', hex: '#00FFCC' },
   { name: 'Electric Indigo', hex: '#6600FF' },
-  { name: 'Gold', hex: '#D4AF37' },
+  { name: 'Gold', hex: '#D4AF37' }
+];
+
+const NOTE_COLORS = [
+  { name: 'Jaune', hex: '#FEF3C7' },
+  { name: 'Bleu', hex: '#DBEAFE' },
+  { name: 'Vert', hex: '#DCFCE7' },
+  { name: 'Rose', hex: '#FCE7F3' },
+  { name: 'Violet', hex: '#EDE9FE' }
 ];
 
 const getIcon = (domain) => `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
 
+const buildApp = (name, url) => {
+  const domain = new URL(url).hostname;
+  return { name, url, icon: getIcon(domain) };
+};
+
+const normalizeUrl = (raw) => {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const parsed = new URL(withScheme);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+};
+
+const downloadFile = (filename, content, type) => {
+  const blob = new Blob([content], { type });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+};
+
+const DEFAULT_APPS = {
+  streaming: [
+    buildApp('Netflix', 'https://www.netflix.com'),
+    buildApp('YouTube', 'https://www.youtube.com'),
+    buildApp('Disney+', 'https://www.disneyplus.com'),
+    buildApp('Prime Video', 'https://www.primevideo.com'),
+    buildApp('OQEE Free', 'https://oqee.tv'),
+    buildApp('MyCanal', 'https://www.canalplus.com'),
+    buildApp('Crunchyroll', 'https://www.crunchyroll.com'),
+    buildApp('Twitch', 'https://www.twitch.tv')
+  ],
+  music: [
+    buildApp('Spotify', 'https://open.spotify.com'),
+    buildApp('Deezer', 'https://www.deezer.com'),
+    buildApp('Apple Music', 'https://music.apple.com'),
+    buildApp('SoundCloud', 'https://soundcloud.com'),
+    buildApp('Mixcloud', 'https://www.mixcloud.com'),
+    buildApp('TuneIn', 'https://tunein.com')
+  ],
+  social: [
+    buildApp('WhatsApp', 'https://web.whatsapp.com'),
+    buildApp('Messenger', 'https://www.messenger.com'),
+    buildApp('Teams', 'https://teams.microsoft.com'),
+    buildApp('Discord', 'https://discord.com'),
+    buildApp('Telegram', 'https://web.telegram.org'),
+    buildApp('Google Meet', 'https://meet.google.com'),
+    buildApp('Slack', 'https://slack.com')
+  ],
+  games: [
+    buildApp('Xbox Cloud', 'https://www.xbox.com/play'),
+    buildApp('GeForce Now', 'https://play.geforcenow.com'),
+    buildApp('Steam Web', 'https://store.steampowered.com'),
+    buildApp('Chess.com', 'https://www.chess.com'),
+    buildApp('Roblox', 'https://www.roblox.com'),
+    buildApp('Twitch Games', 'https://www.twitch.tv/directory/game/Games')
+  ],
+  travel: [
+    buildApp('Waze', 'https://www.waze.com/live-map'),
+    buildApp('ABRP', 'https://abetterrouteplanner.com'),
+    buildApp('Google Maps', 'https://www.google.com/maps'),
+    buildApp('PlugShare', 'https://www.plugshare.com'),
+    buildApp('ChargeMap', 'https://chargemap.com')
+  ],
+  food: [
+    buildApp('TripAdvisor', 'https://www.tripadvisor.fr'),
+    buildApp('TheFork', 'https://www.thefork.fr'),
+    buildApp('Uber Eats', 'https://www.ubereats.com'),
+    buildApp('Deliveroo', 'https://deliveroo.fr')
+  ],
+  icloud: [
+    buildApp('iCloud Mail', 'https://www.icloud.com/mail'),
+    buildApp('Photos', 'https://www.icloud.com/photos'),
+    buildApp('Find My', 'https://www.icloud.com/find'),
+    buildApp('iCloud Notes', 'https://www.icloud.com/notes'),
+    buildApp('iCloud Drive', 'https://www.icloud.com/iclouddrive')
+  ],
+  tools: [
+    buildApp('Chrome Remote', 'https://remotedesktop.google.com/access'),
+    buildApp('Windows 365', 'https://windows365.microsoft.com'),
+    buildApp('Notion', 'https://www.notion.so'),
+    buildApp('Trello', 'https://trello.com'),
+    buildApp('Google Drive', 'https://drive.google.com')
+  ],
+  ai: [
+    buildApp('ChatGPT', 'https://chatgpt.com'),
+    buildApp('Gemini', 'https://gemini.google.com/app'),
+    buildApp('Claude AI', 'https://claude.ai'),
+    buildApp('Perplexity', 'https://www.perplexity.ai'),
+    buildApp('Hume Voice', 'https://demo.hume.ai/')
+  ],
+  tesla: [
+    buildApp('TezLab', 'https://tezlabapp.com'),
+    buildApp('Tessie', 'https://www.tessie.com'),
+    buildApp('TeslaFi', 'https://www.teslafi.com'),
+    buildApp('Tesla Shop', 'https://shop.tesla.com'),
+    buildApp('Tesla Account', 'https://www.tesla.com/teslaaccount')
+  ]
+};
+
 const AI_PROVIDERS = [
-  { id: 'grok', name: 'xAI Grok', url: 'https://x.com/i/grok?q=', icon: getIcon('x.com') },
-  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/?q=', icon: getIcon('chatgpt.com') },
-  { id: 'gemini', name: 'Google Gemini', url: 'https://gemini.google.com/app?q=', icon: getIcon('gemini.google.com') },
-  { id: 'claude', name: 'Claude AI', url: 'https://claude.ai/new?q=', icon: getIcon('claude.ai') },
-  { id: 'google', name: 'Search', url: 'https://www.google.com/search?q=', icon: getIcon('google.com') },
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    url: 'https://gemini.google.com/app?q=',
+    icon: getIcon('gemini.google.com')
+  },
+  {
+    id: 'chatgpt',
+    name: 'ChatGPT',
+    url: 'https://chatgpt.com/?q=',
+    icon: getIcon('chatgpt.com')
+  },
+  {
+    id: 'claude',
+    name: 'Anthropic Claude',
+    url: 'https://claude.ai/new?q=',
+    icon: getIcon('claude.ai')
+  },
+  {
+    id: 'google',
+    name: 'Google Search',
+    url: 'https://www.google.com/search?q=',
+    icon: getIcon('google.com')
+  },
+  {
+    id: 'grok',
+    name: 'xAI Grok',
+    url: 'https://x.com/i/grok?q=',
+    icon: getIcon('x.com')
+  },
+  {
+    id: 'hume',
+    name: 'Hume Voice',
+    url: 'https://demo.hume.ai/',
+    voiceUrl: 'https://demo.hume.ai/',
+    icon: getIcon('demo.hume.ai')
+  }
 ];
 
-const App = () => {
+export default function App() {
   const [user, setUser] = useState(null);
-  const [view, setView] = useState('home'); 
-  const [activeTab, setActiveTab] = useState('streaming');
-  const [links, setLinks] = useState([]);
-  const [notes, setNotes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState('home');
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showBookmarkInfo, setShowBookmarkInfo] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  const [profile, setProfile] = useState({ name: 'Pilote', color: '#E82127', openMode: 'tab' });
+  const [cloudStatus, setCloudStatus] = useState({ auth: 'loading', db: 'unknown' });
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [installPrompt, setInstallPrompt] = useState(null);
+
   const [homeSearch, setHomeSearch] = useState('');
   const [quickUrl, setQuickUrl] = useState('');
-  const [noteInput, setNoteInput] = useState('');
+
   const [aiPrompt, setAiPrompt] = useState('');
   const [selectedAI, setSelectedAI] = useState(AI_PROVIDERS[0]);
+  const [isDictating, setIsDictating] = useState(false);
+  const [dictationTarget, setDictationTarget] = useState('ai');
 
-  const [editingLink, setEditingLink] = useState(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [formLink, setFormLink] = useState({ name: '', url: '', category: 'streaming' });
+  const [profile, setProfile] = useState({
+    name: 'Pilote',
+    color: '#E82127',
+    openMode: 'tab'
+  });
+
+  const [customLinks, setCustomLinks] = useState([]);
+  const [collections, setCollections] = useState([]);
+  const [notes, setNotes] = useState([]);
+  const [noteInput, setNoteInput] = useState('');
+  const [noteTagsInput, setNoteTagsInput] = useState('');
+  const [noteColor, setNoteColor] = useState(NOTE_COLORS[0].hex);
+  const [noteReminder, setNoteReminder] = useState('');
+  const [notesSearch, setNotesSearch] = useState('');
+  const [notesMode, setNotesMode] = useState('compose');
+  const [newApp, setNewApp] = useState({ name: '', url: '', category: 'streaming', pinned: false });
+  const [appIconUrl, setAppIconUrl] = useState('');
+  const [iconSearchQuery, setIconSearchQuery] = useState('');
+  const [editingApp, setEditingApp] = useState(null);
+  const [allSortMode, setAllSortMode] = useState('category');
+  const [draggingAppId, setDraggingAppId] = useState(null);
+
+  const recognitionRef = useRef(null);
+  const dictationTargetRef = useRef('ai');
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+    dictationTargetRef.current = dictationTarget;
+  }, [dictationTarget]);
 
   useEffect(() => {
     if (!auth) {
-      setError("Firebase Auth non disponible");
+      setCloudStatus((prev) => ({ ...prev, auth: 'error' }));
       setLoading(false);
       return;
     }
-
-    const initAuth = async () => {
+    const login = async () => {
       try {
         await signInAnonymously(auth);
-      } catch (e) { 
-        console.error("Auth Fail:", e);
-        setError("Mode hors ligne (Auth échoué)");
-        setLoading(false); // Force le chargement même si erreur
+      } catch (e) {
+        setError('Connexion Cloud restreinte');
+        setCloudStatus((prev) => ({ ...prev, auth: 'error' }));
       }
     };
-    initAuth();
-    
+    login();
     const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
+      setUser(u || null);
+      setCloudStatus((prev) => ({ ...prev, auth: u ? 'ready' : 'error' }));
       setLoading(false);
     });
+    return () => unsubscribe();
+  }, []);
 
-    // Sécurité : Force l'affichage après 4 secondes si ça bloque
-    const safetyTimer = setTimeout(() => setLoading(false), 4000);
-    
-    return () => { unsubscribe(); clearTimeout(safetyTimer); };
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   useEffect(() => {
     if (!user || !db) return;
-    try {
-      const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), (d) => {
-        if (d.exists()) setProfile(prev => ({ ...prev, ...d.data() }));
-      });
-      const unsubLinks = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'links'), (s) => {
-        setLinks(s.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
-      const unsubNotes = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'notes'), (s) => {
-        setNotes(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
-      });
-      return () => { unsubProfile(); unsubLinks(); unsubNotes(); };
-    } catch (e) { console.error("Firestore Error", e); }
+    const basePath = ['artifacts', APP_INTERNAL_ID, 'users', user.uid];
+
+    const unsubProfile = onSnapshot(
+      doc(db, ...basePath, 'settings', 'profile'),
+      (d) => {
+        if (d.exists()) setProfile((prev) => ({ ...prev, ...d.data() }));
+        setCloudStatus((prev) => ({ ...prev, db: 'ok' }));
+      },
+      () => setCloudStatus((prev) => ({ ...prev, db: 'error' }))
+    );
+
+    const unsubCollections = onSnapshot(
+      collection(db, ...basePath, 'collections'),
+      (s) => {
+        setCollections(s.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setCloudStatus((prev) => ({ ...prev, db: 'ok' }));
+      },
+      () => setCloudStatus((prev) => ({ ...prev, db: 'error' }))
+    );
+
+    const unsubApps = onSnapshot(
+      collection(db, ...basePath, 'apps'),
+      (s) => {
+        setCustomLinks(s.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setCloudStatus((prev) => ({ ...prev, db: 'ok' }));
+      },
+      () => setCloudStatus((prev) => ({ ...prev, db: 'error' }))
+    );
+
+    const unsubNotes = onSnapshot(
+      collection(db, ...basePath, 'notes'),
+      (s) => {
+        setNotes(s.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setCloudStatus((prev) => ({ ...prev, db: 'ok' }));
+      },
+      () => setCloudStatus((prev) => ({ ...prev, db: 'error' }))
+    );
+
+    return () => {
+      unsubProfile();
+      unsubCollections();
+      unsubApps();
+      unsubNotes();
+    };
   }, [user]);
 
-  const handleLaunch = (url) => {
-    let finalUrl = url.trim();
-    if (!finalUrl) return;
-    if (!/^https?:\/\//i.test(finalUrl)) finalUrl = 'https://' + finalUrl;
-    if (profile.openMode === 'fullscreen') {
-      window.location.href = `https://www.youtube.com/redirect?q=${encodeURIComponent(finalUrl)}&html5=1`;
-    } else {
-      window.open(finalUrl, '_blank');
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition && !recognitionRef.current) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.lang = 'fr-FR';
+      recognition.onresult = (e) => {
+        let transcript = '';
+        for (let i = e.resultIndex; i < e.results.length; i += 1) {
+          transcript += e.results[i][0].transcript;
+        }
+        if (dictationTargetRef.current === 'ai') setAiPrompt(transcript);
+        else setNoteInput(transcript);
+      };
+      recognition.onend = () => setIsDictating(false);
+      recognitionRef.current = recognition;
+    }
+    return () => {
+      clearInterval(timer);
+      recognitionRef.current?.stop();
+    };
+  }, []);
+
+  useEffect(() => {
+    const handler = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+    };
+  }, []);
+
+  const neonGlow = (color, size = 18) => ({
+    boxShadow: `0 0 ${size}px ${color}66, 0 0 ${size * 1.8}px ${color}33`,
+    borderColor: `${color}80`
+  });
+
+  const startDictation = (target) => {
+    if (!recognitionRef.current) return;
+    if (isDictating) {
+      recognitionRef.current.stop();
+      return;
+    }
+    setDictationTarget(target);
+    setIsDictating(true);
+    try {
+      recognitionRef.current.start();
+    } catch {
+      setIsDictating(false);
     }
   };
 
-  const handleSaveLink = async () => {
-    if (!user || !formLink.name || !formLink.url) return;
-    let url = formLink.url.trim();
-    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-    const domain = new URL(url).hostname;
-    const icon = getIcon(domain);
-    const data = { ...formLink, url, icon, updatedAt: serverTimestamp() };
-    if (editingLink) {
-      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'links', editingLink.id), data, { merge: true });
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
+  };
+
+  const toggleFullscreen = async () => {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
     } else {
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'links'), { ...data, createdAt: serverTimestamp() });
+      await document.documentElement.requestFullscreen();
     }
-    setFormLink({ name: '', url: '', category: activeTab });
-    setEditingLink(null);
-    setShowEditModal(false);
+  };
+
+  const handleAppLaunch = (url) => {
+    if (!url) return;
+    if (profile.openMode === 'fullscreen') {
+      window.location.href = url;
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const executeAiPrompt = () => {
     if (!aiPrompt.trim()) return;
-    const url = `${selectedAI.url}${encodeURIComponent(aiPrompt)}`;
-    handleLaunch(url);
+    if (selectedAI.id === 'hume') {
+      handleAppLaunch(selectedAI.voiceUrl || selectedAI.url);
+      return;
+    }
+    const finalUrl = `${selectedAI.url}${encodeURIComponent(aiPrompt)}`;
+    handleAppLaunch(finalUrl);
+  };
+
+  const updateProfile = async (updates) => {
+    setProfile((prev) => ({ ...prev, ...updates }));
+    if (!user || !db) return;
+    await setDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'settings', 'profile'), updates, { merge: true });
+  };
+
+  const createCollection = async (name) => {
+    if (!name.trim()) return;
+    if (!user || !db) {
+      setError('Cloud indisponible pour créer un dossier.');
+      return;
+    }
+    await addDoc(collection(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'collections'), {
+      name: name.trim(),
+      createdAt: serverTimestamp()
+    });
+  };
+
+  const deleteCollection = async (collectionId) => {
+    if (!user || !db) return;
+    if (!window.confirm('Supprimer ce dossier ? Les raccourcis seront déplacés en Perso.')) return;
+    const categoryId = `collection:${collectionId}`;
+    const affected = customLinks.filter((app) => app.category === categoryId);
+    setCustomLinks((prev) => prev.map((app) => (app.category === categoryId ? { ...app, category: 'personal' } : app)));
+    for (const app of affected) {
+      await setDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'apps', app.id), { category: 'personal' }, { merge: true });
+    }
+    await deleteDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'collections', collectionId));
+  };
+
+  const togglePin = async (app) => {
+    setCustomLinks((prev) => prev.map((item) => (item.id === app.id ? { ...item, pinned: !item.pinned } : item)));
+    if (!user || !db) return;
+    await setDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'apps', app.id), { pinned: !app.pinned }, { merge: true });
+  };
+
+  const deleteApp = async (appId) => {
+    if (!user || !db) return;
+    if (!window.confirm('Supprimer ce raccourci ?')) return;
+    setCustomLinks((prev) => prev.filter((app) => app.id !== appId));
+    await deleteDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'apps', appId));
+  };
+
+  const deleteNote = async (noteId) => {
+    if (!user || !db) return;
+    if (!window.confirm('Supprimer cette note ?')) return;
+    setNotes((prev) => prev.filter((note) => note.id !== noteId));
+    await deleteDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'notes', noteId));
+  };
+
+  const openAddModal = () => {
+    setEditingApp(null);
+    setAppIconUrl('');
+    setIconSearchQuery('');
+    setNewApp({ name: '', url: '', category: 'streaming', pinned: false });
+    setError(null);
+    setShowAddModal(true);
+  };
+
+  const openEditModal = (app) => {
+    setEditingApp(app);
+    setNewApp({ name: app.name || '', url: app.url || '', category: app.category || 'streaming', pinned: !!app.pinned });
+    setAppIconUrl(app.icon || '');
+    setIconSearchQuery(app.name || '');
+    setError(null);
+    setShowAddModal(true);
+  };
+
+  const openImageSearch = (query) => {
+    const finalQuery = query || newApp.name || 'app icon';
+    const url = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(finalQuery)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const saveApp = async () => {
+    if (!user || !db) {
+      setError('Cloud indisponible pour créer un raccourci.');
+      return;
+    }
+    if (!newApp.name || !newApp.url) return;
+    const validated = normalizeUrl(newApp.url);
+    if (!validated) {
+      setError('URL invalide. Ex: https://exemple.com');
+      return;
+    }
+    const icon = appIconUrl.trim() || getIcon(new URL(validated).hostname);
+    const categoryCount = customLinks.filter((app) => app.category === newApp.category && app.id !== editingApp?.id).length;
+    const order = editingApp && editingApp.category === newApp.category ? editingApp.order ?? categoryCount : categoryCount;
+    const payload = {
+      name: newApp.name.trim(),
+      url: validated,
+      icon,
+      category: newApp.category,
+      pinned: newApp.pinned,
+      order,
+      updatedAt: serverTimestamp()
+    };
+    if (editingApp) {
+      await setDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'apps', editingApp.id), payload, { merge: true });
+    } else {
+      await addDoc(collection(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'apps'), { ...payload, createdAt: serverTimestamp() });
+    }
+    setShowAddModal(false);
+    setError(null);
+    setEditingApp(null);
+    setAppIconUrl('');
+    setIconSearchQuery('');
+    setNewApp({ name: '', url: '', category: newApp.category, pinned: false });
+  };
+
+  const handleGoogleSearch = () => {
+    if (!homeSearch.trim()) return;
+    const url = `https://www.google.com/search?q=${encodeURIComponent(homeSearch)}`;
+    handleAppLaunch(url);
+  };
+
+  const handleQuickUrlLaunch = () => {
+    const validated = normalizeUrl(quickUrl);
+    if (!validated) {
+      setError('URL invalide. Ex: https://exemple.com');
+      return;
+    }
+    handleAppLaunch(validated);
+  };
+
+  const resolveAppIcon = (appItem) => {
+    if (appItem?.icon) return appItem.icon;
+    try {
+      return getIcon(new URL(appItem.url).hostname);
+    } catch {
+      return getIcon('google.com');
+    }
   };
 
   const categories = [
+    { id: 'all', label: 'All', icon: <LayoutGrid /> },
+    { id: 'ai', label: 'IA', icon: <Brain /> },
     { id: 'streaming', label: 'Médias', icon: <Play /> },
     { id: 'music', label: 'Musique', icon: <Music /> },
     { id: 'social', label: 'Social', icon: <MessageSquare /> },
@@ -221,529 +621,1057 @@ const App = () => {
     { id: 'food', label: 'Resto', icon: <Coffee /> },
     { id: 'icloud', label: 'iCloud', icon: <Cloud /> },
     { id: 'tools', label: 'Remote', icon: <Monitor /> },
-    { id: 'ai', label: 'IA', icon: <Sparkles /> },
     { id: 'tesla', label: 'Tesla', icon: <Car /> },
+    { id: 'notes', label: 'Notes', icon: <StickyNote /> },
+    { id: 'personal', label: 'Perso', icon: <Briefcase /> }
   ];
 
-  const defaultApps = {
-    streaming: [
-      { name: 'Netflix', url: 'https://www.netflix.com' },
-      { name: 'YouTube', url: 'https://www.youtube.com' },
-      { name: 'Disney+', url: 'https://www.disneyplus.com' },
-      { name: 'Prime Video', url: 'https://www.primevideo.com' },
-      { name: 'OQEE Free', url: 'https://oqee.tv' },
-      { name: 'MyCanal', url: 'https://www.canalplus.com' },
-      { name: 'Crunchyroll', url: 'https://www.crunchyroll.com' },
-      { name: 'Twitch', url: 'https://www.twitch.tv' },
-    ],
-    music: [
-      { name: 'Spotify', url: 'https://open.spotify.com' },
-      { name: 'Deezer', url: 'https://www.deezer.com' },
-      { name: 'Apple Music', url: 'https://music.apple.com' },
-      { name: 'SoundCloud', url: 'https://soundcloud.com' },
-      { name: 'Mixcloud', url: 'https://www.mixcloud.com' },
-      { name: 'TuneIn', url: 'https://tunein.com' },
-    ],
-    social: [
-      { name: 'WhatsApp', url: 'https://web.whatsapp.com' },
-      { name: 'Messenger', url: 'https://www.messenger.com' },
-      { name: 'Teams', url: 'https://teams.microsoft.com' },
-      { name: 'Discord', url: 'https://discord.com' },
-      { name: 'Telegram', url: 'https://web.telegram.org' },
-      { name: 'Google Meet', url: 'https://meet.google.com' },
-      { name: 'Slack', url: 'https://slack.com' },
-    ],
-    games: [
-      { name: 'Xbox Cloud', url: 'https://www.xbox.com/play' },
-      { name: 'GeForce Now', url: 'https://play.geforcenow.com' },
-      { name: 'Steam Web', url: 'https://store.steampowered.com' },
-      { name: 'Chess.com', url: 'https://www.chess.com' },
-      { name: 'Roblox', url: 'https://www.roblox.com' },
-      { name: 'Twitch Games', url: 'https://www.twitch.tv/directory/game/Games' },
-    ],
-    travel: [
-      { name: 'Waze', url: 'https://www.waze.com/live-map' },
-      { name: 'ABRP', url: 'https://abetterrouteplanner.com' },
-      { name: 'Google Maps', url: 'https://www.google.com/maps' },
-      { name: 'PlugShare', url: 'https://www.plugshare.com' },
-      { name: 'ChargeMap', url: 'https://chargemap.com' },
-    ],
-    food: [
-      { name: 'TripAdvisor', url: 'https://www.tripadvisor.fr' },
-      { name: 'TheFork', url: 'https://www.thefork.fr' },
-      { name: 'Uber Eats', url: 'https://www.ubereats.com' },
-      { name: 'Deliveroo', url: 'https://deliveroo.fr' },
-    ],
-    icloud: [
-      { name: 'iCloud Mail', url: 'https://www.icloud.com/mail' },
-      { name: 'Photos', url: 'https://www.icloud.com/photos' },
-      { name: 'Find My', url: 'https://www.icloud.com/find' },
-      { name: 'iCloud Notes', url: 'https://www.icloud.com/notes' },
-      { name: 'iCloud Drive', url: 'https://www.icloud.com/iclouddrive' },
-    ],
-    tools: [
-      { name: 'Chrome Remote', url: 'https://remotedesktop.google.com/access' },
-      { name: 'Windows 365', url: 'https://windows365.microsoft.com' },
-      { name: 'Notion', url: 'https://www.notion.so' },
-      { name: 'Trello', url: 'https://trello.com' },
-      { name: 'Google Drive', url: 'https://drive.google.com' },
-    ],
-    ai: [
-      { name: 'ChatGPT', url: 'https://chatgpt.com' },
-      { name: 'Gemini', url: 'https://gemini.google.com/app' },
-      { name: 'Claude AI', url: 'https://claude.ai' },
-      { name: 'Perplexity', url: 'https://www.perplexity.ai' },
-    ],
-    tesla: [
-      { name: 'TezLab', url: 'https://tezlabapp.com' },
-      { name: 'Tessie', url: 'https://www.tessie.com' },
-      { name: 'TeslaFi', url: 'https://www.teslafi.com' },
-      { name: 'Tesla Shop', url: 'https://shop.tesla.com' },
-      { name: 'Tesla Account', url: 'https://www.tesla.com/teslaaccount' },
-    ]
-  };
+  const collectionCategories = collections.map((c) => ({
+    id: `collection:${c.id}`,
+    label: c.name,
+    icon: <Folder />
+  }));
 
-  const allLinks = useMemo(() => {
-    const combined = [...links];
-    Object.keys(defaultApps).forEach(cat => {
-      defaultApps[cat].forEach(app => {
-        if (!combined.find(l => l.name === app.name)) {
-          const domain = new URL(app.url).hostname;
-          combined.push({ id: `def-${app.name}`, ...app, category: cat, icon: getIcon(domain), isDefault: true });
-        }
+  const navigationCategories = [...categories, ...collectionCategories];
+
+  const categoryLabelMap = useMemo(() => {
+    const map = {};
+    categories.forEach((cat) => {
+      map[cat.id] = cat.label;
+    });
+    collections.forEach((col) => {
+      map[`collection:${col.id}`] = col.name;
+    });
+    return map;
+  }, [categories, collections]);
+
+  const allApps = useMemo(() => {
+    const list = [];
+    Object.keys(DEFAULT_APPS).forEach((cat) => {
+      DEFAULT_APPS[cat].forEach((appItem) => {
+        list.push({
+          id: `default-${cat}-${appItem.name}`,
+          ...appItem,
+          category: cat,
+          isDefault: true
+        });
       });
     });
-    return combined;
-  }, [links]);
+    customLinks.forEach((appItem) => {
+      list.push({ ...appItem, isDefault: false });
+    });
+    return list;
+  }, [customLinks]);
 
-  const AnimatedLogo = () => (
-    <div 
-      className="relative w-20 h-20 flex items-center justify-center cursor-pointer active:scale-90 transition-all group"
-      onClick={() => setView('home')}
-    >
-      <div 
-        className="absolute inset-0 rounded-2xl blur-3xl opacity-30 group-hover:opacity-100 transition-opacity animate-pulse duration-[3000ms]"
-        style={{ backgroundColor: profile.color }}
-      />
-      <div 
-        className="relative w-16 h-16 rounded-2xl flex items-center justify-center border-2 border-white/10 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.9)] bg-black"
-      >
-        <div className="absolute inset-0 opacity-20 animate-[pulse_5s_infinite]" style={{ background: `radial-gradient(circle, ${profile.color}, transparent)` }} />
-        <svg viewBox="0 0 100 100" className="w-12 h-12 relative z-10 filter drop-shadow-[0_0_10px_rgba(255,255,255,0.4)]">
-          <path 
-            d="M50 5 L15 60 L45 60 L35 95 L85 40 L55 40 L65 5 Z" 
-            fill={profile.color}
-            className="animate-[dash_2.5s_ease-in-out_infinite]"
-          />
-        </svg>
-      </div>
-    </div>
-  );
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    return allApps
+      .filter((appItem) => (appItem.name || '').toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [allApps, searchQuery]);
 
-  if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="flex flex-col items-center gap-8">
-         <Loader2 className="w-20 h-20 text-red-600 animate-spin" />
-         <p className="text-[12px] font-black uppercase tracking-[0.8em] text-white/20 italic animate-pulse">Chargement...</p>
+  const filteredApps = useMemo(() => {
+    const custom = customLinks
+      .filter((appItem) => appItem.category === activeCategory)
+      .sort((a, b) => {
+        const pinDelta = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+        if (pinDelta !== 0) return pinDelta;
+        const orderDelta = (a.order ?? 0) - (b.order ?? 0);
+        if (orderDelta !== 0) return orderDelta;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    const combined = [...custom, ...(DEFAULT_APPS[activeCategory] || [])];
+    if (!searchQuery) return combined;
+    const query = searchQuery.toLowerCase();
+    return combined.filter((appItem) => appItem.name.toLowerCase().includes(query));
+  }, [activeCategory, customLinks, searchQuery]);
+
+  const filteredNotes = useMemo(() => {
+    if (!notesSearch) return notes;
+    const query = notesSearch.toLowerCase();
+    return notes.filter((note) => {
+      const textMatch = (note.text || '').toLowerCase().includes(query);
+      const tagMatch = (note.tags || []).some((tag) => tag.toLowerCase().includes(query));
+      return textMatch || tagMatch;
+    });
+  }, [notes, notesSearch]);
+
+  const overdueReminders = useMemo(() => {
+    return filteredNotes.filter((note) => note.reminderAt && new Date(note.reminderAt) <= new Date());
+  }, [filteredNotes]);
+
+  const filteredAllApps = useMemo(() => {
+    if (!searchQuery.trim()) return allApps;
+    const query = searchQuery.toLowerCase();
+    return allApps.filter((appItem) => (appItem.name || '').toLowerCase().includes(query));
+  }, [allApps, searchQuery]);
+
+  const groupedAllApps = useMemo(() => {
+    const grouped = {};
+    filteredAllApps.forEach((appItem) => {
+      const label = categoryLabelMap[appItem.category] || appItem.category || 'Autres';
+      if (!grouped[label]) grouped[label] = [];
+      grouped[label].push(appItem);
+    });
+    return Object.keys(grouped)
+      .sort((a, b) => a.localeCompare(b))
+      .map((label) => ({
+        label,
+        apps: grouped[label].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      }));
+  }, [filteredAllApps, categoryLabelMap]);
+
+  const allAppsSorted = useMemo(() => {
+    const sorted = [...filteredAllApps].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (allSortMode === 'za') return sorted.reverse();
+    return sorted;
+  }, [filteredAllApps, allSortMode]);
+
+  const notesPreview = useMemo(() => filteredNotes.slice(0, 6), [filteredNotes]);
+
+  const handleDrop = async (targetId) => {
+    if (activeCategory === 'all') return;
+    if (!draggingAppId || draggingAppId === targetId) return;
+    const categoryApps = customLinks.filter((appItem) => appItem.category === activeCategory);
+    const ordered = [...categoryApps].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const fromIndex = ordered.findIndex((appItem) => appItem.id === draggingAppId);
+    const toIndex = ordered.findIndex((appItem) => appItem.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const next = [...ordered];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    const updates = next.map((appItem, index) => ({ ...appItem, order: index }));
+    setCustomLinks((prev) => prev.map((appItem) => updates.find((u) => u.id === appItem.id) || appItem));
+    if (!user || !db) return;
+    for (const appItem of updates) {
+      await setDoc(doc(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'apps', appItem.id), { order: appItem.order }, { merge: true });
+    }
+    setDraggingAppId(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center">
+        <Loader2 className="w-12 h-12 text-red-600 animate-spin mb-4" />
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 italic">Tesla Hub Loading...</p>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-red-600/30 flex flex-col overflow-hidden">
-      
-      <style>{`
-        @keyframes dash {
-          0%, 100% { filter: drop-shadow(0 0 5px ${profile.color}); transform: scale(1) rotate(0deg); }
-          50% { filter: drop-shadow(0 0 25px ${profile.color}); transform: scale(1.15) rotate(-2deg); }
-        }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .neon-glow { filter: drop-shadow(0 0 10px ${profile.color}80); }
-        .neon-border { border-color: ${profile.color}40; box-shadow: 0 0 20px ${profile.color}15; }
-        .neon-text { text-shadow: 0 0 12px ${profile.color}A0; }
-        input:focus { border-color: ${profile.color}A0; box-shadow: 0 0 20px ${profile.color}20; }
-        .btn-menu {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          backdrop-filter: blur(10px);
-        }
-        .btn-menu-active {
-          background: rgba(255, 255, 255, 0.95);
-          color: black;
-          box-shadow: 0 0 25px ${profile.color}60;
-          border-color: ${profile.color};
-        }
-        .btn-menu:hover {
-          background: rgba(255, 255, 255, 0.1);
-          border-color: rgba(255, 255, 255, 0.2);
-        }
-      `}</style>
-
-      {/* HEADER PREMIUM */}
-      <header className="px-8 py-6 flex justify-between items-center border-b border-white/5 bg-black/60 backdrop-blur-3xl z-50">
-        <div className="flex items-center gap-8">
-          <AnimatedLogo />
-          <div>
-            <h1 className="text-4xl font-black italic uppercase tracking-tighter leading-none neon-text">Tesla Hub <span style={{ color: profile.color }}>Ultimate</span></h1>
-            <div className="flex items-center gap-2 mt-2">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-              <p className="text-[11px] text-white/40 font-black uppercase tracking-[0.5em]">{profile.name} • Master Driver</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-12">
-          <div className="hidden xl:flex flex-col items-end pr-12 border-r border-white/10">
-            <span className="text-5xl font-mono font-light tracking-tighter leading-none neon-text">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-          <div className="flex gap-4">
-            <button onClick={() => window.location.href = `https://www.youtube.com/redirect?q=${encodeURIComponent(window.location.href)}&html5=1`} className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all group shadow-xl">
-              <Maximize className="w-10 h-10 group-hover:scale-110" />
-            </button>
-            <button onClick={() => setView('settings')} className={`p-6 rounded-2xl border transition-all ${view === 'settings' ? 'bg-red-600 border-red-400 shadow-[0_0_30px_rgba(232,33,39,0.4)]' : 'bg-white/5 border-white/5 hover:bg-white/10'}`} style={view === 'settings' ? { backgroundColor: profile.color, borderColor: profile.color } : {}}>
-              <Settings className="w-10 h-10" />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* NAVIGATION ICONIQUE PERSISTANTE */}
-      <nav className="flex justify-center gap-6 py-6 bg-black/40 backdrop-blur-xl border-b border-white/5 z-40 px-4 overflow-x-auto no-scrollbar">
-        <button 
-          onClick={() => setView('home')} 
-          className={`p-5 rounded-2xl transition-all duration-300 ${view === 'home' ? 'btn-menu-active scale-110' : 'btn-menu hover:scale-105'}`}
-        >
-          <LayoutGrid className="w-8 h-8" />
-        </button>
-        {categories.map(cat => (
-          <button 
-            key={cat.id} 
-            onClick={() => { setActiveTab(cat.id); setView('category'); }} 
-            className={`p-5 rounded-2xl transition-all duration-300 relative group ${view === 'category' && activeTab === cat.id ? 'btn-menu-active scale-110' : 'btn-menu hover:scale-105'}`}
-          >
-            {React.cloneElement(cat.icon, { 
-              className: `w-8 h-8 ${view === 'category' && activeTab === cat.id ? '' : 'group-hover:text-white text-white/50'}` 
-            })}
-            {view === 'category' && activeTab === cat.id && (
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full blur-[2px]" style={{ backgroundColor: profile.color }} />
-            )}
+    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-red-600/30 overflow-hidden flex flex-col">
+      <header className="px-6 sm:px-8 py-5 sm:py-6 flex flex-wrap gap-4 items-center justify-between relative z-50 border-b border-white/5 bg-black/40 backdrop-blur-3xl">
+        <div className="flex items-center gap-4 sm:gap-6">
+          <button onClick={() => setActiveCategory('home')} className="group relative flex items-center justify-center w-12 h-12 transition-all hover:scale-110">
+            <div className="absolute inset-0 rounded-full blur-md opacity-20" style={{ backgroundColor: profile.color }} />
+            <svg viewBox="0 0 100 100" className="w-8 h-8 relative z-10 fill-current" style={{ color: profile.color }}>
+              <path d="M50 20l-15 35h10l-2 15 22-40h-10l5-10z" />
+              <path d="M50 5c24.8 0 45 20.2 45 45s-20.2 45-45 45S5 74.8 5 50 25.2 5 50 5z" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="10 5" className="animate-[spin_10s_linear_infinite]" />
+            </svg>
           </button>
-        ))}
-        <button 
-          onClick={() => setView('all-notes')} 
-          className={`p-5 rounded-2xl transition-all duration-300 ${view === 'all-notes' ? 'btn-menu-active scale-110' : 'btn-menu hover:scale-105'}`}
-        >
-          <StickyNote className="w-8 h-8" />
-        </button>
-      </nav>
-
-      <main className="flex-1 overflow-y-auto no-scrollbar p-10 lg:p-14 pb-48">
-        
-        {/* ALERTE ERREUR SI AUTH ECHOUE */}
-        {error && (
-          <div className="mb-8 p-6 bg-red-600/10 border border-red-600/20 rounded-3xl flex items-center gap-4 text-red-500 font-bold animate-pulse">
-            <AlertCircle className="w-6 h-6" /> {error}
-          </div>
-        )}
-
-        {/* VUE : ACCUEIL */}
-        {view === 'home' && (
-          <div className="max-w-7xl mx-auto space-y-24 animate-in fade-in slide-in-from-bottom-10 duration-700">
-            
-            {/* SEARCH BARS */}
-            <div className="grid md:grid-cols-2 gap-12">
-              <div className="relative group">
-                <Search className="absolute left-10 top-1/2 -translate-y-1/2 w-10 h-10 text-white/20 group-focus-within:text-red-600 transition-all" style={{ color: profile.color }} />
-                <input 
-                  type="text" placeholder="Recherche Google..." value={homeSearch}
-                  onChange={e => setHomeSearch(e.target.value)}
-                  onKeyPress={e => e.key === 'Enter' && handleLaunch(`google.com/search?q=${encodeURIComponent(homeSearch)}`)}
-                  className="w-full bg-white/5 border border-white/10 rounded-[3rem] py-12 pl-28 pr-12 outline-none focus:bg-white/[0.08] transition-all text-4xl font-medium shadow-2xl neon-border"
-                />
-                <button onClick={() => handleLaunch(`google.com/search?q=${encodeURIComponent(homeSearch)}`)} className="absolute right-6 top-1/2 -translate-y-1/2 p-6 bg-red-600 rounded-3xl active:scale-90 shadow-xl transition-all" style={{ backgroundColor: profile.color }}><ArrowRight className="w-10 h-10 text-white" /></button>
-              </div>
-              <div className="relative group">
-                <Globe className="absolute left-10 top-1/2 -translate-y-1/2 w-10 h-10 text-white/20 group-focus-within:text-red-600 transition-all" style={{ color: profile.color }} />
-                <input 
-                  type="text" placeholder="https://..." value={quickUrl}
-                  onChange={e => setQuickUrl(e.target.value)}
-                  onKeyPress={e => e.key === 'Enter' && handleLaunch(quickUrl)}
-                  className="w-full bg-white/5 border border-white/10 rounded-[3rem] py-12 pl-28 pr-12 outline-none focus:bg-white/[0.08] transition-all text-4xl font-medium shadow-2xl neon-border"
-                />
-                <button onClick={() => handleLaunch(quickUrl)} className="absolute right-6 top-1/2 -translate-y-1/2 p-6 bg-white text-black rounded-3xl active:scale-90 shadow-xl transition-all"><Send className="w-10 h-10" /></button>
-              </div>
+          <div className="hidden sm:block">
+            <h1 className="text-xl font-black italic uppercase tracking-tighter leading-none">Tesla Hub</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <CheckCircle2 className="w-2.5 h-2.5 text-green-500" />
+              <p className="text-[9px] text-white/30 font-bold uppercase tracking-widest">{profile.name} • {cloudStatus.db === 'ok' ? 'Cloud Active' : 'Cloud Local'}</p>
             </div>
-
-            {/* DASHBOARD GRID TILES */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12">
-              {categories.map(cat => (
+          </div>
+        </div>
+        <div className="flex-1 w-full sm:w-auto max-w-md sm:mx-6 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+          <input
+            type="text"
+            placeholder="Rechercher une app..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setIsSearchOpen(true)}
+            onBlur={() => setTimeout(() => setIsSearchOpen(false), 150)}
+            className="w-full bg-white/5 border border-white/5 rounded-2xl py-2.5 pl-11 pr-4 outline-none focus:border-white/20 transition-all text-sm font-medium backdrop-blur-md"
+          />
+          {isSearchOpen && searchResults.length > 0 && (
+            <div className="absolute left-0 right-0 mt-3 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+              {searchResults.map((appItem) => (
                 <button
-                  key={cat.id}
-                  onClick={() => { setActiveTab(cat.id); setView('category'); }}
-                  className="flex flex-col items-center justify-center gap-6 p-8 aspect-square rounded-[5rem] bg-white/[0.02] border border-white/5 hover:border-white/20 transition-all active:scale-95 shadow-2xl group relative overflow-hidden neon-border"
+                  key={`${appItem.id}-${appItem.name}`}
+                  onMouseDown={() => {
+                    handleAppLaunch(appItem.url);
+                    setSearchQuery('');
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 text-left"
                 >
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity" style={{ backgroundColor: profile.color }} />
-                  <div 
-                    className="w-32 h-32 rounded-[3rem] flex items-center justify-center transition-all group-hover:scale-110 shadow-2xl border border-white/5 neon-glow flex-shrink-0" 
-                    style={{ background: `linear-gradient(135deg, ${profile.color}30, transparent)`, color: profile.color }}
-                  >
-                    {React.cloneElement(cat.icon, { className: "w-16 h-16" })}
+                  <img src={resolveAppIcon(appItem)} alt="" className="w-8 h-8 rounded-lg bg-white/10 p-1" onError={(e) => (e.target.src = getIcon('google.com'))} />
+                  <div className="flex-1">
+                    <p className="text-xs font-bold uppercase tracking-widest text-white/70">{appItem.name}</p>
+                    <p className="text-[9px] uppercase tracking-widest text-white/30">{categoryLabelMap[appItem.category] || appItem.category}</p>
                   </div>
-                  <span className="font-black text-3xl uppercase tracking-tighter italic text-white/40 group-hover:text-white transition-all w-full text-center px-2 truncate">{cat.label}</span>
+                  <ArrowRight className="w-4 h-4 text-white/30" />
                 </button>
               ))}
             </div>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="text-right mr-2 sm:mr-4 border-r border-white/10 pr-3 sm:pr-4">
+            <span className="text-xl font-mono italic tracking-widest leading-none">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10 text-[9px] uppercase font-black tracking-widest">
+            {cloudStatus.db === 'ok' && isOnline ? (
+              <Wifi className="w-3 h-3 text-green-500" />
+            ) : (
+              <WifiOff className="w-3 h-3 text-yellow-400" />
+            )}
+            {cloudStatus.db === 'ok' && isOnline ? 'Cloud OK' : 'Offline'}
+          </div>
+          {installPrompt && (
+            <button onClick={handleInstall} className="px-4 py-2 rounded-2xl bg-white text-black text-[9px] uppercase font-black tracking-widest">
+              Installer
+            </button>
+          )}
+          <button onClick={toggleFullscreen} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/5">
+            <Maximize className="w-6 h-6 text-white/40" />
+          </button>
+          <button onClick={() => setActiveCategory('settings')} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/5">
+            <Settings className="w-6 h-6 text-white/40" />
+          </button>
+        </div>
+      </header>
 
-            {/* QUICK NOTES DASHBOARD */}
-            <div className="grid lg:grid-cols-5 gap-16">
-              <div className="lg:col-span-3 bg-white/5 border border-white/10 rounded-[5rem] p-20 space-y-12 shadow-2xl backdrop-blur-3xl neon-border">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-5xl font-black italic uppercase flex items-center gap-8"><StickyNote style={{ color: profile.color }} className="w-12 h-12 neon-glow" /> Bloc-Notes Cloud</h3>
-                  <button onClick={() => setView('all-notes')} className="px-10 py-5 rounded-2xl bg-white/5 text-[14px] font-black text-white/40 uppercase tracking-[0.4em] hover:text-white transition-all border border-white/5">Historique</button>
+      {error && (
+        <div className="px-6 sm:px-8 py-3 bg-red-600/10 text-red-400 text-xs font-semibold uppercase tracking-widest">
+          {error}
+        </div>
+      )}
+
+      <nav className="px-6 sm:px-8 py-4 flex gap-3 overflow-x-auto no-scrollbar relative z-50 bg-black/20">
+        <button
+          onClick={() => setActiveCategory('home')}
+          className={`flex items-center gap-2 px-6 py-4 rounded-2xl transition-all text-[10px] font-black uppercase tracking-widest ${
+            activeCategory === 'home' ? 'bg-white text-black scale-105 shadow-2xl' : 'bg-white/5 text-white/40 hover:bg-white/10'
+          }`}
+          style={activeCategory === 'home' ? neonGlow(profile.color, 14) : undefined}
+        >
+          <Home className="w-4 h-4" /> Accueil
+        </button>
+        {navigationCategories.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCategory(cat.id)}
+            className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${
+              activeCategory === cat.id ? 'bg-white text-black scale-105 shadow-xl' : 'bg-white/5 text-white/40 hover:bg-white/10'
+            }`}
+            style={activeCategory === cat.id ? neonGlow(profile.color, 14) : undefined}
+          >
+            <span style={{ filter: `drop-shadow(0 0 6px ${profile.color})` }}>{React.cloneElement(cat.icon, { className: 'w-4 h-4' })}</span>
+            {cat.label}
+          </button>
+        ))}
+      </nav>
+
+      <main className="flex-1 relative z-10 overflow-y-auto p-6 sm:p-8 lg:p-12 no-scrollbar">
+        {activeCategory === 'home' && (
+          <div className="relative animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-10">
+            <button onClick={() => setShowBookmarkInfo(true)} className="absolute -top-4 right-0 p-3 bg-white/5 hover:bg-white/10 rounded-full text-white/20 hover:text-yellow-400 group">
+              <Star className="w-4 h-4 group-hover:fill-current" />
+            </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4 backdrop-blur-2xl">
+                <p className="text-[10px] uppercase font-black tracking-widest text-white/40">Recherche Google</p>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                  <input
+                    type="text"
+                    value={homeSearch}
+                    onChange={(e) => setHomeSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleGoogleSearch()}
+                    placeholder="Tapez votre recherche..."
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-14 text-sm font-semibold outline-none"
+                  />
+                  <button
+                    onClick={handleGoogleSearch}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-white text-black rounded-xl hover:scale-105 transition-all"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
                 </div>
-                <textarea 
-                  value={noteInput} onChange={e => setNoteInput(e.target.value)}
-                  placeholder="Tapez ici..." 
-                  className="w-full bg-black/40 border border-white/10 rounded-[3rem] p-12 min-h-[300px] outline-none text-4xl font-medium focus:border-white/30 transition-all shadow-inner"
-                />
-                <button 
-                  onClick={async () => { if (!noteInput.trim()) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'notes'), { text: noteInput, date: new Date().toLocaleString('fr-FR'), createdAt: serverTimestamp() }); setNoteInput(''); }}
-                  className="w-full py-12 rounded-[3rem] font-black text-4xl uppercase tracking-widest bg-white text-black hover:bg-gray-100 active:scale-95 transition-all shadow-2xl"
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4 backdrop-blur-2xl">
+                <p className="text-[10px] uppercase font-black tracking-widest text-white/40">Quick URL</p>
+                <div className="relative">
+                  <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                  <input
+                    type="text"
+                    value={quickUrl}
+                    onChange={(e) => setQuickUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleQuickUrlLaunch()}
+                    placeholder="https://..."
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-14 text-sm font-semibold outline-none"
+                  />
+                  <button
+                    onClick={handleQuickUrlLaunch}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-white text-black rounded-xl hover:scale-105 transition-all"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8">
+              {navigationCategories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className="group relative flex flex-col items-center justify-center aspect-square rounded-[3.5rem] bg-white/[0.02] border border-white/5 hover:border-white/20 transition-all backdrop-blur-2xl hover:scale-105 active:scale-95 overflow-hidden shadow-2xl"
+                  style={neonGlow(profile.color, 16)}
                 >
-                  Sauvegarder
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity" style={{ backgroundColor: profile.color }} />
+                  <div
+                    className="w-24 h-24 rounded-[2rem] mb-6 flex items-center justify-center shadow-2xl transition-all group-hover:scale-110"
+                    style={{ backgroundColor: `${profile.color}15`, color: profile.color }}
+                  >
+                    {React.cloneElement(cat.icon, { className: 'w-12 h-12', style: { filter: `drop-shadow(0 0 10px ${profile.color})` } })}
+                  </div>
+                  <span className="font-black text-[11px] uppercase tracking-[0.3em] text-white/40 group-hover:text-white transition-colors text-center">
+                    {cat.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {showBookmarkInfo && (
+              <div className="mt-8 p-6 bg-yellow-400/10 border border-yellow-400/20 rounded-[2rem] flex items-center justify-between animate-in zoom-in">
+                <div className="flex items-center gap-4">
+                  <Star className="text-yellow-400 fill-current w-6 h-6" />
+                  <p className="text-sm font-bold text-yellow-400/80 uppercase">Ajoutez cette page aux favoris de votre navigateur Tesla.</p>
+                </div>
+                <button onClick={() => setShowBookmarkInfo(false)} className="p-2 hover:bg-white/5 rounded-full">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="lg:col-span-2 space-y-12">
-                 <h3 className="text-[14px] font-black text-white/20 uppercase tracking-[0.8em] ml-12 flex items-center gap-6"><History className="w-8 h-8" /> Mémos récents</h3>
-                 <div className="grid gap-10 max-h-[600px] overflow-y-auto no-scrollbar pr-8">
-                    {notes.slice(0, 3).map(note => (
-                      <div key={note.id} className="bg-white/[0.02] border border-white/5 p-12 rounded-[4rem] flex justify-between items-start group hover:bg-white/5 transition-all neon-border">
-                        <div className="overflow-hidden">
-                          <p className="text-3xl font-bold text-white/80 line-clamp-3 mb-6 leading-tight">{note.text}</p>
-                          <p className="text-[13px] font-black text-white/10 uppercase">{note.date}</p>
-                        </div>
-                      </div>
+            )}
+          </div>
+        )}
+
+        {activeCategory === 'ai' && (
+          <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in pb-20">
+            <div className="text-center space-y-4">
+              <div className="inline-flex items-center gap-3 px-6 py-2 rounded-full bg-white/5 border border-white/10">
+                <Sparkles className="w-4 h-4 text-yellow-400" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-white/60">AI Laboratory</span>
+              </div>
+              <h2 className="text-4xl font-black italic uppercase tracking-tighter leading-none">Quel cerveau utiliser aujourd'hui ?</h2>
+            </div>
+            <div className="bg-white/5 border border-white/10 p-8 sm:p-10 rounded-[3rem] sm:rounded-[4rem] backdrop-blur-3xl shadow-2xl space-y-10 border-white/20">
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="relative w-full md:w-72">
+                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 mb-2 block">Cerveau IA</label>
+                  <select
+                    value={selectedAI.id}
+                    onChange={(e) => setSelectedAI(AI_PROVIDERS.find((p) => p.id === e.target.value))}
+                    className="w-full bg-black/40 border border-white/10 rounded-3xl p-5 appearance-none font-bold text-lg outline-none focus:border-white/20"
+                  >
+                    {AI_PROVIDERS.map((p) => (
+                      <option key={p.id} value={p.id} className="bg-[#111]">
+                        {p.name}
+                      </option>
                     ))}
-                 </div>
+                  </select>
+                  <ChevronDown className="absolute right-5 top-[3.2rem] w-5 h-5 text-white/20 pointer-events-none" />
+                </div>
+                <div className="flex-1 relative">
+                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 mb-2 block">Requête</label>
+                  <input
+                    type="text"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && executeAiPrompt()}
+                    placeholder="Posez votre question..."
+                    className="w-full bg-black/40 border border-white/10 rounded-3xl p-5 pr-36 sm:pr-44 text-lg sm:text-xl font-medium outline-none"
+                  />
+                  <div className="absolute right-2 top-[2.3rem] flex gap-2">
+                    <button
+                      onClick={() => startDictation('ai')}
+                      className={`p-3 rounded-2xl transition-all ${isDictating && dictationTarget === 'ai' ? 'bg-red-600 animate-pulse text-white shadow-lg' : 'bg-white/5 text-white/40'}`}
+                    >
+                      {isDictating && dictationTarget === 'ai' ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                    </button>
+                    {selectedAI.voiceUrl && (
+                      <button
+                        onClick={() => handleAppLaunch(selectedAI.voiceUrl)}
+                        className="p-3 bg-yellow-400 text-black rounded-2xl hover:scale-110 active:scale-95 transition-all shadow-xl"
+                        title="Conversation vocale"
+                      >
+                        <MessageCircle className="w-6 h-6" />
+                      </button>
+                    )}
+                    <button onClick={executeAiPrompt} className="p-3 bg-white text-black rounded-2xl hover:scale-110 active:scale-95 transition-all shadow-xl">
+                      <Send className="w-6 h-6" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                {AI_PROVIDERS.map((ai) => (
+                  <div key={ai.id} className="relative">
+                    <button
+                      onClick={() => {
+                        setSelectedAI(ai);
+                        handleAppLaunch(ai.url);
+                      }}
+                      className={`w-full flex flex-col items-center gap-4 p-6 rounded-[2.5rem] border transition-all ${
+                        selectedAI.id === ai.id ? 'bg-white/10 border-white/30 scale-105' : 'bg-black/20 border-white/5 opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      <img src={ai.icon} className="w-12 h-12 rounded-2xl shadow-xl" alt="" onError={(e) => (e.target.src = getIcon(new URL(ai.url).hostname))} />
+                      <span className="text-[10px] font-black uppercase tracking-tighter text-center">{ai.name.split(' ')[1] || ai.name}</span>
+                    </button>
+                    {ai.voiceUrl && (
+                      <button
+                        onClick={() => handleAppLaunch(ai.voiceUrl)}
+                        className="absolute -top-3 -right-3 p-2 rounded-full bg-yellow-400 text-black shadow-xl"
+                        title="Ouvrir en vocal"
+                      >
+                        <Mic className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         )}
 
-        {/* VUE : CATEGORIE */}
-        {view === 'category' && (
-          <div className="max-w-7xl mx-auto space-y-24 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between border-b border-white/10 pb-20">
-               <div className="flex items-center gap-12">
-                  <button onClick={() => setView('home')} className="p-10 bg-white/5 rounded-[3.5rem] border border-white/5 hover:bg-white/10 active:scale-90 transition-all shadow-xl"><ChevronLeft className="w-16 h-16" /></button>
-                  <h2 className="text-9xl font-black italic uppercase tracking-tighter neon-text" style={{ color: profile.color }}>{activeTab}</h2>
-               </div>
-               <button onClick={() => { setEditingLink(null); setFormLink({name: '', url: '', category: activeTab}); setShowEditModal(true); }} className="px-16 py-10 bg-red-600 rounded-[3rem] font-black text-2xl uppercase shadow-2xl hover:bg-red-500 active:scale-95 transition-all flex items-center gap-6" style={{ backgroundColor: profile.color }}>
-                 <Plus className="w-10 h-10" /> Ajouter
-               </button>
+        {activeCategory === 'notes' && (
+          <div className="space-y-8 animate-in fade-in duration-500 pb-20 max-w-5xl mx-auto">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setNotesMode('compose')}
+                className={`px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest ${
+                  notesMode === 'compose' ? 'bg-white text-black' : 'bg-white/5 text-white/40'
+                }`}
+              >
+                Notes
+              </button>
+              <button
+                onClick={() => setNotesMode('history')}
+                className={`px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest ${
+                  notesMode === 'history' ? 'bg-white text-black' : 'bg-white/5 text-white/40'
+                }`}
+              >
+                Historique
+              </button>
+              {overdueReminders.length > 0 && (
+                <div className="ml-auto flex items-center gap-2 text-[10px] uppercase font-black tracking-widest text-yellow-400">
+                  <Bell className="w-4 h-4" /> {overdueReminders.length} rappel(s)
+                </div>
+              )}
             </div>
 
-            {/* IA LAB SECTION */}
-            {activeTab === 'ai' && (
-              <div className="max-w-6xl mx-auto space-y-16 mb-32 animate-in zoom-in duration-500">
-                 <div className="bg-white/[0.03] border border-white/10 p-16 rounded-[6rem] shadow-2xl backdrop-blur-3xl space-y-16 neon-border">
-                    <div className="text-center space-y-6">
-                       <div className="inline-flex items-center gap-4 px-10 py-3 rounded-full bg-white/5 border border-white/10">
-                          <Cpu className="w-6 h-6 neon-glow" style={{ color: profile.color }} />
-                          <span className="text-[12px] font-black uppercase tracking-[0.6em]">Advanced Intelligence Laboratory</span>
-                       </div>
-                       <h3 className="text-5xl font-black italic uppercase tracking-tight">Posez votre question au moteur</h3>
+            {notesMode === 'compose' && (
+              <div className="space-y-10">
+                <div className="bg-white/5 border border-white/10 p-8 sm:p-10 rounded-[3rem] sm:rounded-[3.5rem] shadow-2xl space-y-6">
+                  <h3 className="text-xl font-black italic uppercase flex items-center gap-3">
+                    <StickyNote style={{ color: profile.color }} /> Blocs-Notes
+                  </h3>
+                  <textarea
+                    value={noteInput}
+                    onChange={(e) => setNoteInput(e.target.value)}
+                    placeholder="Écrivez ou dictez votre note ici..."
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl p-6 min-h-[150px] outline-none text-lg sm:text-xl font-medium focus:border-white/20 transition-all"
+                  />
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      value={noteTagsInput}
+                      onChange={(e) => setNoteTagsInput(e.target.value)}
+                      placeholder="Tags (ex: maison, urgent, voiture)"
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm font-semibold outline-none"
+                    />
+                    <input
+                      type="datetime-local"
+                      value={noteReminder}
+                      onChange={(e) => setNoteReminder(e.target.value)}
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm font-semibold outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      {NOTE_COLORS.map((color) => (
+                        <button
+                          key={color.hex}
+                          onClick={() => setNoteColor(color.hex)}
+                          className={`w-9 h-9 rounded-2xl transition-all ${noteColor === color.hex ? 'ring-4 ring-white/30 scale-110' : 'opacity-60 hover:opacity-100'}`}
+                          style={{ backgroundColor: color.hex }}
+                        />
+                      ))}
                     </div>
-                    <div className="flex flex-col gap-12">
-                       <div className="grid grid-cols-2 sm:grid-cols-5 gap-8">
-                         {AI_PROVIDERS.map(p => (
-                           <button 
-                             key={p.id} onClick={() => setSelectedAI(p)} 
-                             className={`flex flex-col items-center gap-8 p-10 rounded-[4rem] border-2 transition-all ${selectedAI.id === p.id ? 'bg-white/10 border-white/40 scale-105 shadow-2xl' : 'bg-black/20 border-white/5 opacity-40 hover:opacity-100'}`}
-                             style={selectedAI.id === p.id ? { borderColor: profile.color } : {}}
-                           >
-                             <div className="w-20 h-20 bg-black rounded-[1.5rem] flex items-center justify-center p-4 border border-white/5 shadow-inner group-hover:scale-110 transition-all">
-                               <img src={p.icon} className="w-full h-full object-contain" alt="" />
-                             </div>
-                             <span className="text-[12px] font-black uppercase tracking-widest">{p.id}</span>
-                           </button>
-                         ))}
-                       </div>
-                       <div className="relative">
-                          <input 
-                            type="text" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} onKeyPress={e => e.key === 'Enter' && executeAiPrompt()}
-                            placeholder={`Requête pour ${selectedAI.name}...`}
-                            className="w-full bg-black/40 border border-white/10 rounded-[4rem] p-12 pr-48 text-4xl font-medium outline-none shadow-inner"
-                          />
-                          <button onClick={executeAiPrompt} className="absolute right-6 top-1/2 -translate-y-1/2 p-10 bg-white text-black rounded-[3rem] active:scale-90 shadow-2xl hover:bg-gray-100">
-                            <Send className="w-12 h-12" />
-                          </button>
-                       </div>
+                    <div className="flex flex-wrap gap-4">
+                      <button
+                        onClick={() => startDictation('notes')}
+                        className={`px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest ${
+                          isDictating && dictationTarget === 'notes' ? 'bg-red-600 animate-pulse' : 'bg-white/5'
+                        }`}
+                      >
+                        DICTÉE VOCALE
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!user || !db) return;
+                          if (!noteInput.trim()) return;
+                          const tags = noteTagsInput
+                            .split(',')
+                            .map((tag) => tag.trim())
+                            .filter(Boolean);
+                          await addDoc(collection(db, 'artifacts', APP_INTERNAL_ID, 'users', user.uid, 'notes'), {
+                            text: noteInput.trim(),
+                            date: new Date().toLocaleString('fr-FR'),
+                            color: noteColor,
+                            tags,
+                            reminderAt: noteReminder ? new Date(noteReminder).toISOString() : null,
+                            createdAt: serverTimestamp()
+                          });
+                          setNoteInput('');
+                          setNoteTagsInput('');
+                          setNoteReminder('');
+                        }}
+                        className="flex-1 bg-white text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 active:scale-95 transition-all shadow-xl shadow-white/5"
+                      >
+                        SAUVEGARDER
+                      </button>
                     </div>
-                 </div>
+                  </div>
+                </div>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {notesPreview.map((note) => (
+                    <div
+                      key={note.id}
+                      className={`p-8 rounded-[2.5rem] relative group shadow-2xl ${note.reminderAt && new Date(note.reminderAt) <= new Date() ? 'ring-2 ring-red-500' : ''}`}
+                      style={{ backgroundColor: note.color || NOTE_COLORS[0].hex, color: '#111' }}
+                    >
+                      <p className="font-bold text-lg mb-6 leading-tight">{note.text}</p>
+                      {note.tags?.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {note.tags.map((tag) => (
+                            <span key={tag} className="text-[9px] uppercase font-black tracking-widest px-2 py-1 rounded-full bg-black/10">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {note.reminderAt && (
+                        <div className="text-[9px] uppercase font-black tracking-widest mb-4 flex items-center gap-2 opacity-70">
+                          <Bell className="w-3 h-3" /> {new Date(note.reminderAt).toLocaleString('fr-FR')}
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center opacity-30 text-[9px] font-black uppercase">
+                        <span>{note.date}</span>
+                        <button onClick={() => deleteNote(note.id)} className="p-2 hover:text-red-600 transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
-            {/* FOOD SECTION */}
-            {activeTab === 'food' && (
-              <div className="grid md:grid-cols-3 gap-16 mb-32">
-                {[
-                  { name: 'Meilleures Notes', icon: <Star />, url: 'https://www.google.com/maps/search/top+rated+restaurants+near+me/' },
-                  { name: 'Ouverts', icon: <Coffee />, url: 'https://www.google.com/maps/search/restaurants+open+now+near+me/' },
-                  { name: 'Fast Food', icon: <Zap />, url: 'https://www.google.com/maps/search/fast+food+near+me/' },
-                ].map(res => (
-                  <button key={res.name} onClick={() => handleLaunch(res.url)} className="p-20 bg-white/[0.03] border border-white/10 rounded-[7rem] text-left hover:border-red-600/50 transition-all group relative overflow-hidden neon-border">
-                    <div className="absolute top-0 right-0 w-64 h-64 opacity-10 blur-[120px]" style={{ backgroundColor: profile.color }} />
-                    <div className="mb-12 neon-glow" style={{ color: profile.color }}>{React.cloneElement(res.icon, { className: "w-24 h-24" })}</div>
-                    <div className="text-6xl font-black italic uppercase tracking-tighter leading-none mb-8">{res.name}</div>
-                    <ChevronRight className="absolute bottom-20 right-20 w-20 h-20 text-white/5 group-hover:text-white group-hover:translate-x-6 transition-all" />
+            {notesMode === 'history' && (
+              <div className="space-y-8">
+                <div className="bg-white/5 border border-white/10 p-8 sm:p-10 rounded-[3rem] sm:rounded-[3.5rem] shadow-2xl space-y-6">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <h3 className="text-xl font-black italic uppercase flex items-center gap-3">
+                      <StickyNote style={{ color: profile.color }} /> Historique complet
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={() => downloadFile('notes.json', JSON.stringify(filteredNotes, null, 2), 'application/json')}
+                        className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/10 text-[10px] uppercase font-black tracking-widest"
+                      >
+                        <Download className="w-4 h-4" /> Export JSON
+                      </button>
+                      <button
+                        onClick={() => {
+                          const content = filteredNotes.map((note) => `- ${note.text} (${note.tags?.join(', ') || 'sans tags'})`).join('\n');
+                          downloadFile('notes.txt', content, 'text/plain');
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/10 text-[10px] uppercase font-black tracking-widest"
+                      >
+                        <Download className="w-4 h-4" /> Export TXT
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={notesSearch}
+                    onChange={(e) => setNotesSearch(e.target.value)}
+                    placeholder="Rechercher une note ou un tag..."
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm font-semibold outline-none"
+                  />
+                </div>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredNotes.map((note) => (
+                    <div
+                      key={note.id}
+                      className={`p-8 rounded-[2.5rem] relative group shadow-2xl ${note.reminderAt && new Date(note.reminderAt) <= new Date() ? 'ring-2 ring-red-500' : ''}`}
+                      style={{ backgroundColor: note.color || NOTE_COLORS[0].hex, color: '#111' }}
+                    >
+                      <p className="font-bold text-lg mb-6 leading-tight">{note.text}</p>
+                      {note.tags?.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {note.tags.map((tag) => (
+                            <span key={tag} className="text-[9px] uppercase font-black tracking-widest px-2 py-1 rounded-full bg-black/10">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {note.reminderAt && (
+                        <div className="text-[9px] uppercase font-black tracking-widest mb-4 flex items-center gap-2 opacity-70">
+                          <Bell className="w-3 h-3" /> {new Date(note.reminderAt).toLocaleString('fr-FR')}
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center opacity-30 text-[9px] font-black uppercase">
+                        <span>{note.date}</span>
+                        <button onClick={() => deleteNote(note.id)} className="p-2 hover:text-red-600 transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeCategory === 'settings' && (
+          <div className="max-w-3xl mx-auto space-y-8 py-10 animate-in slide-in-from-right-8 duration-500 pb-24">
+            <section className="bg-white/5 border border-white/10 p-8 sm:p-10 rounded-[3rem] sm:rounded-[3.5rem] shadow-2xl space-y-10 backdrop-blur-md">
+              <h2 className="text-2xl font-black italic uppercase flex items-center gap-4">
+                <Settings className="w-7 h-7" style={{ color: profile.color }} /> Configuration
+              </h2>
+              <div className="space-y-10">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4">Nom du Pilote</label>
+                  <input
+                    type="text"
+                    value={profile.name}
+                    onChange={(e) => updateProfile({ name: e.target.value })}
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl p-5 text-2xl font-black outline-none focus:border-white/20"
+                  />
+                </div>
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 flex items-center gap-2">
+                    <Monitor className="w-3 h-3" /> Mode d'ouverture
+                  </label>
+                  <div className="grid grid-cols-2 gap-3 p-2 bg-black/40 rounded-3xl border border-white/5">
+                    <button
+                      onClick={() => updateProfile({ openMode: 'tab' })}
+                      className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                        profile.openMode === 'tab' ? 'bg-white text-black' : 'text-white/40 hover:bg-white/5'
+                      }`}
+                    >
+                      NOUVEL ONGLET
+                    </button>
+                    <button
+                      onClick={() => updateProfile({ openMode: 'fullscreen' })}
+                      className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                        profile.openMode === 'fullscreen' ? 'bg-red-600 text-white' : 'text-white/40 hover:bg-white/5'
+                      }`}
+                    >
+                      PLEIN ÉCRAN
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-4 flex items-center gap-2">
+                    <Palette className="w-3 h-3" /> Signature visuelle
+                  </label>
+                  <div className="flex gap-5 flex-wrap">
+                    {THEME_COLORS.map((c) => (
+                      <button
+                        key={c.hex}
+                        onClick={() => updateProfile({ color: c.hex })}
+                        className={`w-14 h-14 rounded-2xl transition-all ${profile.color === c.hex ? 'scale-110 ring-4 ring-white/20' : 'opacity-40 hover:opacity-80'}`}
+                        style={{ backgroundColor: c.hex }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-white/5 border border-white/10 p-8 sm:p-10 rounded-[3rem] sm:rounded-[3.5rem] shadow-2xl space-y-6 backdrop-blur-md">
+              <h3 className="text-xl font-black italic uppercase flex items-center gap-3">
+                <Folder className="w-5 h-5" style={{ color: profile.color }} /> Dossiers personnalisés
+              </h3>
+              <input
+                type="text"
+                placeholder="Nom du dossier"
+                className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm font-semibold outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.target.value.trim()) {
+                    createCollection(e.target.value.trim());
+                    e.target.value = '';
+                  }
+                }}
+              />
+              <div className="grid gap-3">
+                {collections.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between bg-black/40 border border-white/10 rounded-2xl p-4">
+                    <span className="font-bold text-sm">{c.name}</span>
+                    <button onClick={() => deleteCollection(c.id)} className="p-2 text-white/30 hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {activeCategory === 'all' && (
+          <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => setAllSortMode('category')}
+                className={`px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest ${
+                  allSortMode === 'category' ? 'bg-white text-black' : 'bg-white/5 text-white/40'
+                }`}
+              >
+                Par catégorie
+              </button>
+              <button
+                onClick={() => setAllSortMode((prev) => (prev === 'az' ? 'za' : 'az'))}
+                className={`px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest ${
+                  allSortMode !== 'category' ? 'bg-white text-black' : 'bg-white/5 text-white/40'
+                }`}
+              >
+                {allSortMode === 'za' ? 'Z/A' : 'A/Z'}
+              </button>
+            </div>
+
+            {allSortMode === 'category' ? (
+              <div className="space-y-10">
+                {groupedAllApps.map((group) => (
+                  <div key={group.label} className="space-y-4">
+                    <h3 className="text-xs font-black uppercase tracking-[0.3em] text-white/30">{group.label}</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
+                      {group.apps.map((appItem) => (
+                        <button
+                          key={appItem.id}
+                          onClick={() => handleAppLaunch(appItem.url)}
+                          className="group flex flex-col items-center justify-between aspect-[4/3] rounded-[2.5rem] bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] hover:border-white/20 transition-all shadow-xl active:scale-95 relative overflow-hidden p-4"
+                        >
+                          <div
+                            className="w-20 h-20 rounded-3xl mb-3 flex items-center justify-center p-3 border border-white/10 bg-gradient-to-br from-white/10 to-white/0"
+                            style={neonGlow(profile.color, 12)}
+                          >
+                            <img
+                              src={resolveAppIcon(appItem)}
+                              className="w-full h-full object-contain filter drop-shadow-lg"
+                              alt=""
+                              onError={(e) => {
+                                e.target.src = getIcon(new URL(appItem.url).hostname);
+                              }}
+                            />
+                          </div>
+                          <div className="flex flex-col items-center gap-1 w-full">
+                            <span className="font-black text-[10px] uppercase text-white/60 text-center leading-tight break-words min-h-[32px]">
+                              {appItem.name}
+                            </span>
+                            <span className="text-[8px] uppercase tracking-widest text-white/30">{categoryLabelMap[appItem.category] || appItem.category}</span>
+                          </div>
+                          {!appItem.isDefault && (
+                            <div className="absolute -top-2 -right-2 flex flex-col gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  togglePin(appItem);
+                                }}
+                                className="p-2.5 bg-yellow-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-10"
+                              >
+                                <Pin className="w-4 h-4 text-black" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(appItem);
+                                }}
+                                className="p-2.5 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-10"
+                              >
+                                <Edit2 className="w-4 h-4 text-black" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteApp(appItem.id);
+                                }}
+                                className="p-2.5 bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-10"
+                              >
+                                <Trash2 className="w-4 h-4 text-white" />
+                              </button>
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
+                {allAppsSorted.map((appItem) => (
+                  <button
+                    key={appItem.id}
+                    onClick={() => handleAppLaunch(appItem.url)}
+                    className="group flex flex-col items-center justify-between aspect-[4/3] rounded-[2.5rem] bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] hover:border-white/20 transition-all shadow-xl active:scale-95 relative overflow-hidden p-4"
+                  >
+                    <div
+                      className="w-20 h-20 rounded-3xl mb-3 flex items-center justify-center p-3 border border-white/10 bg-gradient-to-br from-white/10 to-white/0"
+                      style={neonGlow(profile.color, 12)}
+                    >
+                      <img
+                        src={resolveAppIcon(appItem)}
+                        className="w-full h-full object-contain filter drop-shadow-lg"
+                        alt=""
+                        onError={(e) => {
+                          e.target.src = getIcon(new URL(appItem.url).hostname);
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-col items-center gap-1 w-full">
+                      <span className="font-black text-[10px] uppercase text-white/60 text-center leading-tight break-words min-h-[32px]">
+                        {appItem.name}
+                      </span>
+                      <span className="text-[8px] uppercase tracking-widest text-white/30">{categoryLabelMap[appItem.category] || appItem.category}</span>
+                    </div>
+                    {!appItem.isDefault && (
+                      <div className="absolute -top-2 -right-2 flex flex-col gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePin(appItem);
+                          }}
+                          className="p-2.5 bg-yellow-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-10"
+                        >
+                          <Pin className="w-4 h-4 text-black" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(appItem);
+                          }}
+                          className="p-2.5 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-10"
+                        >
+                          <Edit2 className="w-4 h-4 text-black" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteApp(appItem.id);
+                          }}
+                          className="p-2.5 bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-10"
+                        >
+                          <Trash2 className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
             )}
+          </div>
+        )}
 
-            {/* APP GRID */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-20 gap-y-28">
-              {allLinks.filter(l => l.category === activeTab).map((link) => (
-                <div key={link.id} className="flex flex-col items-center group relative">
-                  <button
-                    onClick={() => handleLaunch(link.url)}
-                    className="w-full aspect-square rounded-[5rem] bg-white/[0.03] border border-white/5 hover:border-white/20 transition-all active:scale-95 shadow-2xl flex items-center justify-center overflow-hidden relative neon-border"
-                  >
-                    <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <img src={link.icon} alt={link.name} onError={(e) => e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(link.name)}&background=111&color=fff&bold=true`} className="w-32 h-32 object-contain filter drop-shadow-[0_0_20px_rgba(0,0,0,0.6)] group-hover:scale-115 transition-transform duration-500 relative z-10" />
-                  </button>
-                  
-                  <div className="mt-4 flex items-center justify-center gap-2 w-full">
-                    <span className="font-black text-xl tracking-tight text-white/40 uppercase italic group-hover:text-white transition-all truncate max-w-[150px]">{link.name}</span>
-                    <button 
-                      onClick={() => { setEditingLink(link); setFormLink({ name: link.name, url: link.url, category: link.category }); setShowEditModal(true); }}
-                      className="p-1.5 bg-white/5 hover:bg-white text-white/20 hover:text-black rounded-lg transition-all shadow-lg opacity-30 group-hover:opacity-100 border border-white/5"
+        {activeCategory !== 'home' && activeCategory !== 'settings' && activeCategory !== 'ai' && activeCategory !== 'notes' && activeCategory !== 'all' && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 animate-in fade-in duration-500 pb-20">
+            {filteredApps.map((appItem, idx) => (
+              <button
+                key={appItem.id || idx}
+                onClick={() => handleAppLaunch(appItem.url)}
+                className="group flex flex-col items-center justify-between aspect-[4/3] rounded-[2.5rem] bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] hover:border-white/20 transition-all shadow-xl active:scale-95 relative overflow-hidden p-4"
+                draggable={!!appItem.id}
+                onDragStart={() => appItem.id && setDraggingAppId(appItem.id)}
+                onDragOver={(e) => appItem.id && e.preventDefault()}
+                onDrop={() => appItem.id && handleDrop(appItem.id)}
+              >
+                <div className="absolute left-4 top-4 opacity-40 flex items-center gap-2">
+                  {appItem.id && <GripVertical className="w-4 h-4" />}
+                  {appItem.pinned && <Pin className="w-3 h-3 text-yellow-400" />}
+                </div>
+                <div
+                  className="w-20 h-20 rounded-3xl mb-3 flex items-center justify-center p-3 border border-white/10 bg-gradient-to-br from-white/10 to-white/0"
+                  style={neonGlow(profile.color, 12)}
+                >
+                  <img
+                    src={resolveAppIcon(appItem)}
+                    className="w-full h-full object-contain filter drop-shadow-lg"
+                    alt=""
+                    onError={(e) => {
+                      e.target.src = getIcon(new URL(appItem.url).hostname);
+                    }}
+                  />
+                </div>
+                <div className="flex flex-col items-center gap-1 w-full">
+                  <span className="font-black text-[10px] uppercase text-white/60 text-center leading-tight break-words min-h-[32px]">
+                    {appItem.name}
+                  </span>
+                </div>
+                {appItem.id && (
+                  <div className="absolute -top-2 -right-2 flex flex-col gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePin(appItem);
+                      }}
+                      className="p-2.5 bg-yellow-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-10"
                     >
-                      <Settings className="w-4 h-4" />
+                      <Pin className="w-4 h-4 text-black" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(appItem);
+                      }}
+                      className="p-2.5 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-10"
+                    >
+                      <Edit2 className="w-4 h-4 text-black" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteApp(appItem.id);
+                      }}
+                      className="p-2.5 bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-10"
+                    >
+                      <Trash2 className="w-4 h-4 text-white" />
                     </button>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* VUE : TOUTES LES NOTES */}
-        {view === 'all-notes' && (
-          <div className="max-w-7xl mx-auto space-y-24 animate-in fade-in duration-500">
-             <div className="flex items-center gap-12 border-b border-white/10 pb-20">
-                <button onClick={() => setView('home')} className="p-10 bg-white/5 rounded-[3.5rem] border border-white/5"><ChevronLeft className="w-16 h-16" /></button>
-                <h2 className="text-9xl font-black italic uppercase tracking-tighter neon-text" style={{ color: profile.color }}>Gestion Cloud</h2>
-             </div>
-             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-16">
-               {notes.map(note => (
-                 <div key={note.id} className="bg-white/[0.03] border border-white/10 p-16 rounded-[6rem] space-y-12 shadow-2xl group hover:border-white/20 transition-all relative neon-border">
-                    <p className="text-5xl font-medium leading-tight text-white/90">{note.text}</p>
-                    <div className="flex justify-between items-center pt-12 border-t border-white/5">
-                       <span className="text-[14px] font-black text-white/10 uppercase tracking-[0.5em]">{note.date}</span>
-                       <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id))} className="p-8 bg-red-600/10 text-red-600 rounded-[2rem] hover:bg-red-600 hover:text-white transition-all active:scale-90 shadow-xl"><Trash2 className="w-10 h-10"/></button>
-                    </div>
-                 </div>
-               ))}
-               {notes.length === 0 && <div className="col-span-full p-64 text-center text-white/5 font-black uppercase italic text-7xl border-2 border-dashed border-white/5 rounded-[7rem]">Base de données vide</div>}
-            </div>
-          </div>
-        )}
-
-        {/* VUE : PARAMÈTRES (RÉGLAGES OS) */}
-        {view === 'settings' && (
-          <div className="max-w-6xl mx-auto space-y-24 animate-in slide-in-from-right-10 duration-500 pb-64">
-            <div className="flex items-center justify-between border-b border-white/10 pb-20">
-               <h2 className="text-9xl font-black italic uppercase tracking-tighter">Réglages OS</h2>
-               <button onClick={() => setView('home')} className="px-20 py-12 bg-white text-black rounded-[4rem] font-black text-3xl uppercase shadow-2xl hover:bg-gray-100 active:scale-95 transition-all">Quitter</button>
-            </div>
-            
-            <div className="grid lg:grid-cols-2 gap-20">
-               <div className="bg-white/5 border border-white/10 rounded-[6rem] p-20 space-y-20 shadow-2xl backdrop-blur-3xl neon-border">
-                  <div className="space-y-8 text-center">
-                     <label className="text-[14px] font-black text-white/20 uppercase tracking-[0.6em]">Pilote assigné</label>
-                     <input 
-                       type="text" value={profile.name} onChange={e => { const n = e.target.value; setProfile({...profile, name: n}); setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), { name: n }, { merge: true }); }}
-                       className="w-full bg-black/40 border border-white/10 rounded-[3rem] p-14 text-6xl font-black outline-none text-center shadow-inner"
-                       style={{ color: profile.color }}
-                     />
-                  </div>
-                  <div className="space-y-16">
-                     <label className="text-center block text-[14px] font-black text-white/20 uppercase tracking-[0.6em]">Signature Lumineuse</label>
-                     <div className="grid grid-cols-4 gap-8">
-                       {THEME_COLORS.map(c => (
-                         <button 
-                           key={c.hex} onClick={() => { setProfile({...profile, color: c.hex}); setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), { color: c.hex }, { merge: true }); }}
-                           className={`aspect-square rounded-[3rem] transition-all relative ${profile.color === c.hex ? 'scale-110 shadow-2xl z-10 border-8 border-white' : 'opacity-20 hover:opacity-100 hover:scale-105'}`}
-                           style={{ backgroundColor: c.hex, boxShadow: profile.color === c.hex ? `0 0 100px ${c.hex}A0` : '' }}
-                         >
-                           {profile.color === c.hex && <CheckCircle2 className="absolute -top-6 -right-6 text-white fill-black w-14 h-14" />}
-                         </button>
-                       ))}
-                     </div>
-                  </div>
-               </div>
-
-               <div className="bg-white/5 border border-white/10 rounded-[6rem] p-20 space-y-20 shadow-2xl backdrop-blur-3xl flex flex-col justify-center neon-border">
-                  <label className="text-[14px] font-black text-white/20 uppercase tracking-[0.6em] text-center mb-10">Moteur de Redirection</label>
-                  <button 
-                    onClick={() => { setProfile({...profile, openMode: 'tab'}); setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), { openMode: 'tab' }, { merge: true }); }}
-                    className={`p-16 rounded-[5rem] border-4 mb-14 transition-all text-left group ${profile.openMode === 'tab' ? 'bg-white text-black border-white shadow-2xl scale-105' : 'bg-transparent border-white/10 text-white/20 hover:bg-white/10'}`}
-                  >
-                     <div className="text-5xl font-black italic uppercase tracking-tighter">Navigateur Multi</div>
-                     <p className="text-sm font-bold mt-6 uppercase opacity-40">Standard navigateur (Multi-Fenêtres)</p>
-                  </button>
-                  <button 
-                    onClick={() => { setProfile({...profile, openMode: 'fullscreen'}); setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), { openMode: 'fullscreen' }, { merge: true }); }}
-                    className={`p-16 rounded-[5rem] border-4 transition-all text-left group ${profile.openMode === 'fullscreen' ? 'bg-red-600 text-white border-red-400 shadow-2xl scale-105' : 'bg-transparent border-white/10 text-white/20 hover:bg-white/10'}`}
-                    style={profile.openMode === 'fullscreen' ? { backgroundColor: profile.color, borderColor: profile.color } : {}}
-                  >
-                     <div className="text-5xl font-black italic uppercase tracking-tighter">Plein Écran Total</div>
-                     <p className="text-sm font-bold mt-6 uppercase opacity-60">Utilise la redirection YouTube</p>
-                  </button>
-               </div>
-            </div>
+                )}
+              </button>
+            ))}
+            <button
+              onClick={openAddModal}
+              className="flex flex-col items-center justify-center aspect-[4/3] rounded-[2.5rem] border-2 border-dashed border-white/10 hover:border-white/30 transition-all text-white/10 hover:text-white group active:scale-95"
+            >
+              <Plus className="w-8 h-8 mb-2 group-hover:scale-110" />
+              <span className="font-black text-[9px] uppercase tracking-widest">Ajouter</span>
+            </button>
           </div>
         )}
       </main>
 
-      {/* MODAL EDIT / AJOUT */}
-      {showEditModal && (
-        <div className="fixed inset-0 bg-black/98 backdrop-blur-3xl flex items-center justify-center z-[100] p-10 animate-in zoom-in duration-300">
-          <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-4xl rounded-[7rem] p-24 space-y-20 shadow-2xl neon-border">
-            <h2 className="text-7xl font-black italic uppercase tracking-widest text-center" style={{ color: profile.color }}>{editingLink ? "Édition App" : "Nouvelle App"}</h2>
-            <div className="space-y-16">
-              <div className="space-y-6">
-                 <label className="text-[14px] font-black uppercase text-white/20 ml-12 tracking-[0.5em]">Désignation</label>
-                 <input type="text" value={formLink.name} onChange={e => setFormLink({...formLink, name: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-[3rem] p-14 text-6xl font-black outline-none transition-all shadow-inner" placeholder="Ex: Disney+" />
-              </div>
-              <div className="space-y-6">
-                 <label className="text-[14px] font-black uppercase text-white/20 ml-12 tracking-[0.5em]">Cible (URL)</label>
-                 <input type="text" value={formLink.url} onChange={e => setFormLink({...formLink, url: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-[3rem] p-14 text-4xl outline-none text-white/30 transition-all shadow-inner" placeholder="Ex: disneyplus.com" />
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
-                {categories.map(c => (
-                  <button key={c.id} onClick={() => setFormLink({...formLink, category: c.id})} className={`py-8 rounded-[2.5rem] border-2 transition-all text-[12px] font-black uppercase tracking-widest ${formLink.category === c.id ? 'bg-white text-black border-white shadow-2xl scale-110' : 'bg-transparent border-white/5 text-white/20'}`}>{c.label}</button>
+      <button
+        onClick={toggleFullscreen}
+        className="fixed bottom-6 sm:bottom-8 right-6 sm:right-8 p-5 rounded-[2rem] border border-white/10 shadow-2xl z-[100] hover:scale-110 active:scale-90 transition-all bg-white/5 group overflow-hidden backdrop-blur-3xl"
+      >
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity" style={{ backgroundColor: profile.color }} />
+        <Maximize className="w-6 h-6 text-white/40 group-hover:text-white relative z-10" />
+      </button>
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-3xl flex items-center justify-center z-[100] p-6 animate-in zoom-in duration-200">
+          <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-2xl rounded-[3.5rem] p-10 space-y-8 shadow-2xl">
+            <h2 className="text-2xl font-black italic uppercase tracking-tighter text-center">
+              {editingApp ? 'Modifier le raccourci' : 'Nouveau Raccourci'}
+            </h2>
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={newApp.name}
+                onChange={(e) => {
+                  setNewApp({ ...newApp, name: e.target.value });
+                  if (!iconSearchQuery) setIconSearchQuery(e.target.value);
+                }}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-lg outline-none focus:border-red-500 font-bold"
+                placeholder="Nom du service"
+              />
+              <input
+                type="text"
+                value={newApp.url}
+                onChange={(e) => setNewApp({ ...newApp, url: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-lg outline-none focus:border-red-500 font-bold"
+                placeholder="Lien URL complet"
+              />
+              <select
+                value={newApp.category}
+                onChange={(e) => setNewApp({ ...newApp, category: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-lg outline-none font-bold"
+              >
+                {categories
+                  .filter((cat) => !['ai', 'notes', 'all'].includes(cat.id))
+                  .map((cat) => (
+                    <option key={cat.id} value={cat.id} className="bg-[#111]">
+                      {cat.label}
+                    </option>
+                  ))}
+                {collections.map((c) => (
+                  <option key={c.id} value={`collection:${c.id}`} className="bg-[#111]">
+                    {c.name}
+                  </option>
                 ))}
+              </select>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-3 text-xs font-black uppercase tracking-widest text-white/40">
+                  <input
+                    type="checkbox"
+                    checked={newApp.pinned}
+                    onChange={(e) => setNewApp({ ...newApp, pinned: e.target.checked })}
+                  />
+                  Marquer comme favori
+                </label>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
+                <p className="text-[10px] uppercase tracking-widest text-white/40 font-black">Image / Icône personnalisée</p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="text"
+                    value={iconSearchQuery}
+                    onChange={(e) => setIconSearchQuery(e.target.value)}
+                    placeholder="Recherche Google Images"
+                    className="flex-1 bg-black/40 border border-white/10 rounded-2xl p-4 text-sm font-semibold outline-none"
+                  />
+                  <button
+                    onClick={() => openImageSearch(iconSearchQuery)}
+                    className="px-4 py-3 rounded-2xl bg-white text-black text-[10px] uppercase font-black tracking-widest"
+                  >
+                    Chercher
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={appIconUrl}
+                  onChange={(e) => setAppIconUrl(e.target.value)}
+                  placeholder="Collez l'URL de l'image choisie"
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm font-semibold outline-none"
+                />
+                <p className="text-[10px] uppercase tracking-widest text-white/30">Astuce: ouvrez l'image, copiez l'URL, puis collez-la ici.</p>
+                {appIconUrl && (
+                  <div className="flex items-center gap-4">
+                    <img src={appIconUrl} alt="" className="w-16 h-16 rounded-2xl object-cover border border-white/10" />
+                    <span className="text-[10px] uppercase tracking-widest text-white/40">Aperçu</span>
+                  </div>
+                )}
               </div>
             </div>
-            <div className="flex gap-12">
-              <button onClick={() => { setShowEditModal(false); setEditingLink(null); }} className="flex-1 py-14 rounded-[3.5rem] font-black text-2xl uppercase bg-white/5 hover:bg-white/10 transition-all">Annuler</button>
-              {editingLink && !editingLink.id.startsWith('def-') && (
-                <button onClick={async () => { if(confirm("Supprimer l'application ?")) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'links', editingLink.id)); setShowEditModal(false); } }} className="p-14 rounded-[3.5rem] bg-red-600/10 text-red-600 border border-red-600/20 active:bg-red-600 active:text-white transition-all shadow-xl"><Trash2 className="w-12 h-12"/></button>
-              )}
-              <button onClick={handleSaveLink} className="flex-[2] py-14 rounded-[3.5rem] font-black text-3xl uppercase bg-red-600 shadow-2xl hover:bg-red-500 transition-all" style={{ backgroundColor: profile.color }}>Valider</button>
+            <div className="flex gap-4">
+              <button onClick={() => setShowAddModal(false)} className="flex-1 py-5 rounded-3xl font-black text-xs bg-white/5 uppercase">
+                Fermer
+              </button>
+              <button
+                onClick={saveApp}
+                className="flex-1 py-5 rounded-3xl font-black text-xs bg-red-600 uppercase"
+              >
+                {editingApp ? 'Mettre à jour' : 'Valider'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      <footer className="py-16 text-center opacity-5 mt-auto pointer-events-none z-50">
-        <p className="text-[28px] font-black uppercase tracking-[3.8em] italic">Tesla OS Unified • v19.0</p>
+      <footer className="py-6 text-center opacity-10 select-none pointer-events-none z-50">
+        <p className="text-[8px] font-black uppercase tracking-[1.5em] italic">Tesla OS Immersive • v16.0</p>
       </footer>
     </div>
   );
-};
-
-export default App;
+}
