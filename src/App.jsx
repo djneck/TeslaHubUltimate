@@ -610,6 +610,18 @@ export default function App() {
     }
   };
 
+  const autoIconUrl = useMemo(() => {
+    const validated = normalizeUrl(newApp.url);
+    if (!validated) return '';
+    try {
+      return getIcon(new URL(validated).hostname);
+    } catch {
+      return '';
+    }
+  }, [newApp.url]);
+
+  const previewIcon = appIconUrl.trim() || autoIconUrl;
+
   const categories = [
     { id: 'all', label: 'All', icon: <LayoutGrid /> },
     { id: 'ai', label: 'IA', icon: <Brain /> },
@@ -760,7 +772,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-red-600/30 overflow-hidden flex flex-col">
+    <div className="min-h-screen h-screen bg-[#050505] text-white font-sans selection:bg-red-600/30 overflow-hidden flex flex-col">
+      <div className="sticky top-0 z-50">
       <header className="px-6 sm:px-8 py-5 sm:py-6 flex flex-wrap gap-4 items-center justify-between relative z-50 border-b border-white/5 bg-black/40 backdrop-blur-3xl">
         <div className="flex items-center gap-4 sm:gap-6">
           <button onClick={() => setActiveCategory('home')} className="group relative flex items-center justify-center w-12 h-12 transition-all hover:scale-110">
@@ -868,54 +881,58 @@ export default function App() {
         ))}
       </nav>
 
-      <main className="flex-1 relative z-10 overflow-y-auto p-6 sm:p-8 lg:p-12 no-scrollbar">
+      <div className="px-6 sm:px-8 pb-4 pt-3 bg-black/30 border-b border-white/5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white/5 border border-white/10 rounded-[1.5rem] p-4 space-y-3 backdrop-blur-2xl">
+            <p className="text-[9px] uppercase font-black tracking-widest text-white/40">Recherche Google</p>
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+              <input
+                type="text"
+                value={homeSearch}
+                onChange={(e) => setHomeSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleGoogleSearch()}
+                placeholder="Tapez votre recherche..."
+                className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-14 text-sm font-semibold outline-none"
+              />
+              <button
+                onClick={handleGoogleSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-white text-black rounded-xl hover:scale-105 transition-all"
+              >
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <div className="bg-white/5 border border-white/10 rounded-[1.5rem] p-4 space-y-3 backdrop-blur-2xl">
+            <p className="text-[9px] uppercase font-black tracking-widest text-white/40">Quick URL</p>
+            <div className="relative">
+              <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+              <input
+                type="text"
+                value={quickUrl}
+                onChange={(e) => setQuickUrl(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleQuickUrlLaunch()}
+                placeholder="https://..."
+                className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-14 text-sm font-semibold outline-none"
+              />
+              <button
+                onClick={handleQuickUrlLaunch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-white text-black rounded-xl hover:scale-105 transition-all"
+              >
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <main className="flex-1 min-h-0 relative z-10 overflow-y-auto p-6 sm:p-8 lg:p-12 no-scrollbar">
         {activeCategory === 'home' && (
           <div className="relative animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-10">
             <button onClick={() => setShowBookmarkInfo(true)} className="absolute -top-4 right-0 p-3 bg-white/5 hover:bg-white/10 rounded-full text-white/20 hover:text-yellow-400 group">
               <Star className="w-4 h-4 group-hover:fill-current" />
             </button>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4 backdrop-blur-2xl">
-                <p className="text-[10px] uppercase font-black tracking-widest text-white/40">Recherche Google</p>
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                  <input
-                    type="text"
-                    value={homeSearch}
-                    onChange={(e) => setHomeSearch(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleGoogleSearch()}
-                    placeholder="Tapez votre recherche..."
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-14 text-sm font-semibold outline-none"
-                  />
-                  <button
-                    onClick={handleGoogleSearch}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-white text-black rounded-xl hover:scale-105 transition-all"
-                  >
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4 backdrop-blur-2xl">
-                <p className="text-[10px] uppercase font-black tracking-widest text-white/40">Quick URL</p>
-                <div className="relative">
-                  <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                  <input
-                    type="text"
-                    value={quickUrl}
-                    onChange={(e) => setQuickUrl(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleQuickUrlLaunch()}
-                    placeholder="https://..."
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-14 text-sm font-semibold outline-none"
-                  />
-                  <button
-                    onClick={handleQuickUrlLaunch}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-white text-black rounded-xl hover:scale-105 transition-all"
-                  >
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8">
               {navigationCategories.map((cat) => (
                 <button
@@ -1363,7 +1380,7 @@ export default function App() {
                           className="group flex flex-col items-center justify-between aspect-[4/3] rounded-[2.5rem] bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] hover:border-white/20 transition-all shadow-xl active:scale-95 relative overflow-hidden p-4"
                         >
                           <div
-                            className="w-20 h-20 rounded-3xl mb-3 flex items-center justify-center p-3 border border-white/10 bg-gradient-to-br from-white/10 to-white/0"
+                            className="w-24 h-24 rounded-3xl mb-3 flex items-center justify-center p-4 border border-white/10 bg-gradient-to-br from-white/10 to-white/0"
                             style={neonGlow(profile.color, 12)}
                           >
                             <img
@@ -1427,7 +1444,7 @@ export default function App() {
                     className="group flex flex-col items-center justify-between aspect-[4/3] rounded-[2.5rem] bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] hover:border-white/20 transition-all shadow-xl active:scale-95 relative overflow-hidden p-4"
                   >
                     <div
-                      className="w-20 h-20 rounded-3xl mb-3 flex items-center justify-center p-3 border border-white/10 bg-gradient-to-br from-white/10 to-white/0"
+                      className="w-24 h-24 rounded-3xl mb-3 flex items-center justify-center p-4 border border-white/10 bg-gradient-to-br from-white/10 to-white/0"
                       style={neonGlow(profile.color, 12)}
                     >
                       <img
@@ -1500,7 +1517,7 @@ export default function App() {
                   {appItem.pinned && <Pin className="w-3 h-3 text-yellow-400" />}
                 </div>
                 <div
-                  className="w-20 h-20 rounded-3xl mb-3 flex items-center justify-center p-3 border border-white/10 bg-gradient-to-br from-white/10 to-white/0"
+                  className="w-24 h-24 rounded-3xl mb-3 flex items-center justify-center p-4 border border-white/10 bg-gradient-to-br from-white/10 to-white/0"
                   style={neonGlow(profile.color, 12)}
                 >
                   <img
@@ -1646,10 +1663,10 @@ export default function App() {
                   className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm font-semibold outline-none"
                 />
                 <p className="text-[10px] uppercase tracking-widest text-white/30">Astuce: ouvrez l'image, copiez l'URL, puis collez-la ici.</p>
-                {appIconUrl && (
+                {previewIcon && (
                   <div className="flex items-center gap-4">
-                    <img src={appIconUrl} alt="" className="w-16 h-16 rounded-2xl object-cover border border-white/10" />
-                    <span className="text-[10px] uppercase tracking-widest text-white/40">Aperçu</span>
+                    <img src={previewIcon} alt="" className="w-16 h-16 rounded-2xl object-cover border border-white/10" />
+                    <span className="text-[10px] uppercase tracking-widest text-white/40">{appIconUrl ? 'Personnalisée' : 'Auto'}</span>
                   </div>
                 )}
               </div>
